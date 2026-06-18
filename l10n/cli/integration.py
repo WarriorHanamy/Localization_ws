@@ -35,7 +35,7 @@ def cmd_build(_args):
     build_cmd = (
         f"source /opt/ros/{ROS_DISTRO}/setup.bash && "
         f"cd {shlex.quote(REMOTE_PATH)} && "
-        f"catkin config --init && "
+        f"catkin config --init --source-space . && "
         f"rm -rf build devel && "
         f"catkin build --no-status"
     )
@@ -56,7 +56,7 @@ def cmd_increment(_args):
     build_cmd = (
         f"source /opt/ros/{ROS_DISTRO}/setup.bash && "
         f"cd {shlex.quote(REMOTE_PATH)} && "
-        f"catkin config --init && "
+        f"catkin config --init --source-space . && "
         f"catkin build --no-status"
     )
     run_ssh(build_cmd)
@@ -76,7 +76,7 @@ def cmd_full(_args):
     build_cmd = (
         f"source /opt/ros/{ROS_DISTRO}/setup.bash && "
         f"cd {shlex.quote(REMOTE_PATH)} && "
-        f"catkin config --init && "
+        f"catkin config --init --source-space . && "
         f"rm -rf build devel && "
         f"catkin build --no-status"
     )
