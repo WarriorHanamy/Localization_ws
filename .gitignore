@@ -1,0 +1,29 @@
+# Build / devel artifacts (catkin)
+build/
+devel/
+install/
+logs/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Point cloud maps (runtime data, not source)
+*.pcd
+*.bag
+*.ply
+
+# FAST_LIO runtime logs (keep analysis scripts: plot.py, guide.md, *.m)
+FAST_LIO/Log/*.txt
+
+# Compiled objects / libraries
+*.o
+*.so
+*.a
