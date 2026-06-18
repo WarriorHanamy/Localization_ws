@@ -27,3 +27,6 @@ FAST_LIO/Log/*.txt
 *.o
 *.so
 *.a
+
+# Virtual environment
+.venv/

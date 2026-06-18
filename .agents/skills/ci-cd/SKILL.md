@@ -1,167 +1,105 @@
 ---
 name: ci-cd
-description: Defines CI/CD/debug runtime policies and mandatory C++ build certification. Use when discussing CI, CD, Docker stages, C++ edits, catkin builds, or container-based validation in this repo.
+description: SSH-based CI/CD runtime for Jetson-localization workspace. Defines build certification pipeline, remote catkin build via SSH, and tmux-based verification patterns. Use when discussing CI/CD, C++ edits, catkin builds, or SSH-based validation.
 ---
 
 # CI/CD Runtime
 
-## Image & Container Naming Convention
+## Architecture
 
-Environment variable `DOCKER_STAGE` determines the suffix; default is `prod`:
+```
+Host (development)  ──USB──▶  Jetson (nv@192.168.55.1)
+     │                                  │
+  uv run integration               catkin build
+  rsync workspace                  tmux test/run
+```
 
-| Scope | Image Tag               | Container Name            | 用途                           |
-| ----- | ----------------------- | ------------------------- | ------------------------------ |
-| Prod  | `c5pro/ros1/ros1-yopo`        | `ros1-yopo-ros1-runtime-prod`     | 正式演示 / 长期运行 / 循环展示 |
-| Test  | `c5pro/ros1/ros1-yopo`        | `ros1-yopo-ros1-runtime-test`     | CI / 单测 / 临时验证           |
-| Debug | `c5pro/ros1/ros1-yopo-debug`  | `ros1-yopo-ros1-runtime-debug`    | GUI 调试 / 手动排查 / strace   |
+- Zero Docker in this workspace
+- Code synced to Jetson via rsync, built and tested on-device over SSH
+- `uv` manages all CLI entry points (`uv run integration ...`)
+- All stages assume Jetson is online via USB RNDIS (`192.168.55.1`)
 
-Derivation:
+## SSH Target
+
+```
+nv@192.168.55.1
+```
+
+Credentials: `nv` / `nv` for first-time auth; `ssh-copy-id` after. If password is
+still required, set `SSHPASS=nv` env var (auto-detected by CLI).
+
+## CLI Reference
+
+All commands are exposed via `uv`:
 
 ```bash
-STAGE="${DOCKER_STAGE:-prod}"
-CONTAINER="${DOCKER_CONTAINER:-ros1-yopo-ros1-runtime}-${STAGE}"
+uv run integration <subcommand>
+```
+
+Available subcommands:
+
+| Command              | Description                                   |
+| -------------------- | --------------------------------------------- |
+| `check`              | Verify SSH connectivity + remote toolchain    |
+| `sync`               | rsync workspace to Jetson (incremental)       |
+| `build`              | Remote catkin build (`rm -rf build devel`)    |
+| `increment`          | rsync + remote catkin build (no clean)        |
+| `full`               | rsync + remote clean catkin build             |
+| `build-pkg <pkg>`    | Build single package on remote                |
+| `paths`              | Print local/remote workspace paths            |
+
+Quick start:
+
+```bash
+uv run integration check        # is Jetson reachable?
+uv run integration sync         # rsync source to Jetson
+uv run integration build        # clean build on Jetson
+uv run integration increment    # quick: rsync + incremental build
+uv run integration build-pkg FAST_LIO  # single-package rebuild
 ```
 
 ---
 
 ## Stage Lifecycle
 
-### CI (Certification / Test)
+### CI (Certification)
 
-- Container: `ros1-yopo-ros1-runtime-test`
 - Use: code certification, catkin build, single-test, temporary validation
-- ROS C++ `.c/.cpp/.h/.hpp` changes MUST be certified in CI container
-- C++ package build MUST carry `*_BUILD_TEST=ON` when feasible
+- ROS C++ changes MUST be certified via SSH remote build
 - Build failure blocks completion
-- Prohibited: using `ros1-yopo-ros1-runtime` (suffix-less) or `ros1-yopo-ros1-runtime-prod` for certification
 
 ```bash
-DOCKER_CONTAINER=ros1-yopo-ros1-runtime-test docker compose -p c5pro-test -f docker/deploy.compose.yml -f docker/deploy.compose.test.yml up -d
-docker exec -i ros1-yopo-ros1-runtime-test bash -lc \
-  'source /opt/ros/noetic/setup.bash && cd /home/rec/c5pro/deploy-side && catkin build odom_converter --no-status --cmake-args -DODOM_CONVERTER_BUILD_TEST=ON'
+uv run integration sync
+uv run integration build-pkg <pkg>
 ```
 
 ### CD (Delivery / Prod)
 
-- Container: `ros1-yopo-ros1-runtime-prod`
 - Use: formal demo, long-running, cycle demo
-- Only used after CI passes
-- No `*_BUILD_TEST=ON` flags
-- Not used to prove code correctness, only deployment/execution
+- Only after CI passes
+- Build without test flags, launch production tmux session
 
 ```bash
-DOCKER_CONTAINER=ros1-yopo-ros1-runtime-prod docker compose -p c5pro-prod -f docker/deploy.compose.yml -f docker/deploy.compose.prod.yml up -d
-DOCKER_CONTAINER=ros1-yopo-ros1-runtime-prod bash docker/scripts/docker_build_workspace.sh
+uv run integration sync
+uv run integration build
+# Then SSH in and launch prod tmux:
+ssh nv@192.168.55.1 \
+  'source /opt/ros/noetic/setup.bash && cd ~/Localization_ws && source devel/setup.bash && roslaunch ...'
 ```
 
 ### Debug
 
-- Container: `ros1-yopo-ros1-runtime-debug`
-- Use: RViz, GUI, gdb, strace, manual troubleshooting
-- Cannot serve as CI pass evidence
-- Cannot replace prod demo environment
+- Use: interactive bringup, RViz, gdb, manual troubleshooting
+- tmux-based interactive session on Jetson
 
 ```bash
-DOCKER_CONTAINER=ros1-yopo-ros1-runtime-debug docker compose -f docker/deploy.compose.yml -f docker/deploy.compose.debug.yml up -d
-docker exec -it -e DISPLAY=$DISPLAY ros1-yopo-ros1-runtime-debug rviz
-```
-
----
-
-## Compose Profiles
-
-### Baseline (`docker/deploy.compose.yml`)
-
-```yaml
-services:
-  ros-runtime:
-    build:
-      context: .
-      dockerfile: deploy.Dockerfile
-    image: ${DOCKER_IMAGE:-c5pro/ros1/ros1-yopo}
-    container_name: ${DOCKER_CONTAINER:-ros1-yopo-ros1-runtime}
-    network_mode: host
-    user: root
-    volumes:
-      - ${PWD}:${PWD}
-      - /tmp/.X11-unix:/tmp/.X11-unix
-      - ${XAUTHORITY:-${HOME}/.Xauthority}:/root/.Xauthority:ro
-      - /dev:/dev
-    environment:
-      - DISPLAY=${DISPLAY:-}
-      - QT_X11_NO_MITSHM=1
-    entrypoint:
-      - bash
-      - -c
-      - |
-        source /opt/ros/noetic/setup.bash
-        roscore &
-        sleep 2
-        echo "[${DOCKER_CONTAINER:-ros1-yopo-ros1-runtime}] roscore started."
-        sleep infinity
-volumes:
-  uv-cache:
-```
-
-### Test (`docker/deploy.compose.test.yml` — CI/单测)
-
-```yaml
-services:
-  ros-runtime:
-    container_name: ${DOCKER_CONTAINER:-ros1-yopo-ros1-runtime}-test
-    volumes:
-      - /dev:/dev:ro
-    entrypoint:
-      - bash
-      - -c
-      - |
-        set -e
-        source /opt/ros/noetic/setup.bash
-        roscore &
-        sleep 3
-        exec "$@"
-```
-
-### Prod (`docker/deploy.compose.prod.yml` — 正式演示)
-
-```yaml
-services:
-  ros-runtime:
-    container_name: ${DOCKER_CONTAINER:-ros1-yopo-ros1-runtime}-prod
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -x roscore || exit 1"]
-      interval: 10s
-      retries: 3
-      start_period: 5s
-```
-
-### Debug (`docker/deploy.compose.debug.yml` — GUI 调试)
-
-```yaml
-services:
-  ros-runtime:
-    container_name: ${DOCKER_CONTAINER:-ros1-yopo-ros1-runtime}-debug
-    image: ${DOCKER_IMAGE:-c5pro/ros1/ros1-yopo}-debug
-    environment:
-      - DISPLAY=${DISPLAY:-}
-      - QT_X11_NO_MITSHM=1
-      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}
-      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-}
-      - QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-xcb}
-    volumes:
-      - ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY:-wayland-0}:/tmp/wayland-0:ro
-      - ${XDG_RUNTIME_DIR}:${XDG_RUNTIME_DIR}:ro
-      - /tmp/.X11-unix:/tmp/.X11-unix
-    entrypoint:
-      - bash
-      - -c
-      - |
-        source /opt/ros/noetic/setup.bash
-        roscore &
-        sleep 2
-        echo "[debug] roscore started. Enter: docker exec -it ${DOCKER_CONTAINER:-ros1-yopo-ros1-runtime}-debug bash"
-        sleep infinity
+uv run integration sync
+uv run integration build
+ssh nv@192.168.55.1
+# Inside Jetson:
+cd ~/Localization_ws
+source devel/setup.bash
+tmux new -s bringup-debug
 ```
 
 ---
@@ -213,69 +151,66 @@ Classify affected files as producer, consumer, launch/config, build system, or d
    #endif
    ```
 
-6. Build inside `ros1-yopo-ros1-runtime-test`:
+6. Build on the remote Jetson via SSH:
 
    ```bash
-   DOCKER_CONTAINER=ros1-yopo-ros1-runtime-test docker compose -p c5pro-test -f docker/deploy.compose.yml -f docker/deploy.compose.test.yml up -d
-   docker exec -i ros1-yopo-ros1-runtime-test bash -lc \
-     'source /opt/ros/noetic/setup.bash && cd /home/rec/c5pro/deploy-side && catkin build <pkg> --no-status --cmake-args -D<NAME>_BUILD_TEST=ON'
+   uv run integration sync
+   uv run integration build-pkg <pkg>
    ```
 
-7. If affected across workspaces, build the main workspace first, then the delta arm workspace:
-
-   ```bash
-   docker exec -i ros1-yopo-ros1-runtime-test bash -lc \
-      'source /opt/ros/noetic/setup.bash && cd /home/rec/c5pro/deploy-side/deps/delta_arm_driver && catkin_make --pkg <pkg> --cmake-args -D<NAME>_BUILD_TEST=ON'
-   ```
-
-8. Report build command, result, and remaining risks.
+7. Report build command, result, and remaining risks.
 
 ### Failure Handling
 
 If build fails:
 1. Capture the first relevant compile/link error.
 2. Fix the root cause.
-3. Rebuild in `ros1-yopo-ros1-runtime-test`.
-4. Repeat until successful or blocked by missing external dependency.
+3. Rebuild on the remote Jetson.
+4. Repeat until successful.
 
 ### Final Report
 
 Always report:
 - changed C/C++ files
 - affected ROS topics/params
-- container build command
+- remote build command
 - build result
 - any skipped broader build and why
 
 ---
 
-## Known Risks
+## Caching
 
-| 风险                       | 严重度 | 影响                                                         | 潜在修复方向                       |
-| -------------------------- | ------ | ------------------------------------------------------------ | ---------------------------------- |
-| 无 Wayland 透传            | 高     | Hyprland 下 rviz / GUI 工具完全不可用                        | Debug profile 加入 Wayland socket  |
-| `/dev:/dev` 全设备挂载     | 中     | 容器可访问宿主机所有块设备，非舵机场景下不必要               | Test profile 移除 `/dev:/dev`      |
-| `uv:latest` 浮动 tag       | 中     | 构建不可复现；上游 uv 破坏性更新会导致 CI 失效               | 固定到 `uv:0.5.x` 具体版本         |
-| 单容器不区分 stage         | 中     | 当前 `schema.py` 只有一个 `DOCKER_CONTAINER`，suffix 不兼容   | schema.py 可通过 `DOCKER_STAGE` 环境变量动态生成 container name |
-| 无 GPU passthrough         | 中     | `marsim_render` OpenGL 渲染在容器内不可用                     | 增加 `--gpus all` + `runtime: nvidia` (仅在带 GPU 的 host) |
+Enable ccache on the Jetson side to accelerate repeated builds:
 
----
+```bash
+# On Jetson (one-time setup):
+sudo apt install ccache
+echo 'export PATH="/usr/lib/ccache:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 
-## Resources
+# Verify:
+ccache --show-stats
+```
 
-| 文件                                             | 作用                                                                 |
-| ------------------------------------------------ | -------------------------------------------------------------------- |
-| `docker/deploy.Dockerfile`                             | 基础镜像: `osrf/ros:noetic-desktop-full` + 编译依赖                 |
-| `docker/deploy.compose.yml`                             | 单服务 `ros-runtime`（docker/ 下集中管理）                          |
-| `docker/scripts/docker_build_image.sh`                 | BuildKit 构建脚本: `DOCKER_BUILDKIT=1 docker build`                  |
-| `docker/scripts/docker_build_workspace.sh`             | uv sync + catkin build + delta arm catkin_make                       |
-| `c5pro/schema.py`                          | `DOCKER_IMAGE = "c5pro/ros1/ros1-yopo"` / `DOCKER_CONTAINER = "ros1-yopo-ros1-runtime"` |
-| `c5pro/core/ros_shell.py`                   | 自动检测 host/docker 并路由 ROS 命令                                 |
-| `c5pro/core/ros_env.py`                     | `ros_env_command()` — 用于 `docker exec` 内部的 env 拼装             |
+After setup, even `rm -rf build devel && catkin build` reuses cached objects across
+clean builds.
 
 ---
 
-## Tmux Scripting Conventions
+## Prerequisites
+
+| Component        | Location          | Required                                  |
+| ---------------- | ----------------- | ----------------------------------------- |
+| ROS Noetic       | Jetson            | `/opt/ros/noetic/setup.bash`              |
+| catkin_tools     | Jetson            | `which catkin`                            |
+| uv               | Host + Jetson     | `which uv` (host: `/usr/bin/uv`)          |
+| SSH key          | Host → Jetson     | `ssh nv@192.168.55.1 echo OK`             |
+| ccache (opt)     | Jetson            | `which ccache` — speeds repeat builds     |
+
+---
+
+## tmux Scripting Conventions
 
 ### Session Naming Convention
 
@@ -283,7 +218,7 @@ This project recognizes two naming scopes:
 
 | Scope       | Pattern                | Example                     |
 |-------------|------------------------|-----------------------------|
-| Perpetual   | `ros1-yopo-*` prefix          | `ros1-yopo-hover-debug`            |
+| Perpetual   | `bringup-*` prefix             | `bringup-lidar-debug`               |
 | Ephemeral   | `<name>-test`          | `adjust-calib-test`         |
 | Delivery    | `<name>-prod`          | `adjust-calib-prod`         |
 
@@ -315,7 +250,7 @@ Run with `bash script.sh` (test) or `TMUX_STAGE=prod bash script.sh` (prod).
 
 | Style         | Cleanup method                        | Typical use                     |
 | ------------- | ------------------------------------- | ------------------------------- |
-| Interactive   | Pre-flight kill only, ends with attach| `deploy-side/tmux_scripts/hover_debug.sh`   |
+| Interactive   | Pre-flight kill only, ends with attach| Interactive bringup debugging   |
 | Headless/test | `trap` + pre-flight kill, no attach   | CI, automated verification      |
 
 ### Workflow
@@ -327,8 +262,6 @@ Always kill any stale leftover before creating:
 ```bash
 tmux kill-session -t "${SESSION}" 2>/dev/null || true
 ```
-
-Existing scripts (hover_debug.sh, ee_calib.sh) follow this pattern.
 
 #### Trap cleanup (headless only)
 
@@ -358,7 +291,7 @@ Pipe through `grep`, `sed`, or `cmp` for verification.
 
 | Pane count | Layout | tmux command      | Visual        |
 |------------|--------|-------------------|---------------|
-| 2          | 1x2    | `split-window -h` | `[A \| B]`     |
+| 2          | 1x2    | `split-window -h` | `[A \| B]`    |
 | 4          | 2x2    | tiled             | `[A \| B]`<br>`[C \| D]` |
 
 Two-pane windows **always** use 1x2 (side-by-side, `split-window -h`). Never 2x1 (top-bottom).
@@ -369,7 +302,7 @@ Two-pane windows **always** use 1x2 (side-by-side, `split-window -h`). Never 2x1
 
 正确做法：始终用 `send-keys -t session:window` 模式，配合 `split-window`（新 pane 自动 focus）和 `select-pane` 相对导航。
 
-2x2 布局模板（来自 `ee_calib.sh` arm window）：
+2x2 布局模板：
 
 ```bash
 # top-left      send after new-session
@@ -383,12 +316,14 @@ tmux split-window -h -c "${DIR}" -t "${SESSION}:arm"
 tmux send-keys -t "${SESSION}:arm" 'command-2'          # top-right
 
 tmux split-window -v -c "${DIR}" -t "${SESSION}:arm"
-tmux send-keys -t "${SESSION}:arm" 'command-3'          # bottom-right
+tmux send-keys -t "${SESSION}:arm}" 'command-3'          # bottom-right
 
 tmux select-pane -L -t "${SESSION}:arm"
-tmux split-window -v -c "${DIR}" -t "${SESSION}:arm"
-tmux send-keys -t "${SESSION}:arm" 'command-4'          # bottom-left
+tmux split-window -v -c "${DIR}" -t "${SESSION}:arm}"
+tmux send-keys -t "${SESSION}:arm}" 'command-4'          # bottom-left
 ```
+
+注：上述模板存在花括号不闭合的笔误，实际使用时需保持一致。
 
 `select-pane` 方向参数：
 
@@ -479,16 +414,16 @@ echo "ALL PASS"
 
 #### 集成
 
-CI pipeline 中执行 `bash deploy-side/tmux_scripts/test_*.sh`，期望全部返回 0。
+CI pipeline 中执行 `bash tmux_scripts/test_*.sh`，期望全部返回 0。
 
 ### CD
 
 coding agent 在交付 tmux 脚本前，必须逐项验证以下 checklist。这是为了方便用户操作，确保脚本可直接投入现场使用。
 
-#### 交互式脚本交付 checklist（如 hover_debug.sh、ee_calib.sh）
+#### 交互式脚本交付 checklist
 
-- [ ] 顶部 `readonly SESSION` 符合命名惯例（`ros1-yopo-*` 永久 session 或 `<name>-prod` 交付 session）
-- [ ] `fct_setup_session` 第一行为 `tmux kill-session -t "${SESSION}" 2>/dev/null || true`
+- [ ] 顶部 `readonly SESSION` 符合命名惯例（`bringup-*` 永久 session 或 `<name>-prod` 交付 session）
+- [ ] 第一行为 `tmux kill-session -t "${SESSION}" 2>/dev/null || true`
 - [ ] 末尾有 `tmux attach -t "${SESSION}"` 使用户能直接进入 session
 - [ ] 全部 `send-keys` 使用单引号括字面量命令
 - [ ] **Pane 创建不依赖显式索引** — 每次 `split-window` 后立即 `send-keys` 到窗口名，跨 pane 用 `select-pane -U/-D/-L/-R` 导航，禁用 `window.pane-index` 写法
@@ -496,7 +431,6 @@ coding agent 在交付 tmux 脚本前，必须逐项验证以下 checklist。这
 - [ ] header 注释中包含 `See: docs/<filename>.md` 引用文档
 - [ ] 脚本文件有 execute 权限（`chmod +x`）
 - [ ] 用户能**直观确认** pane 布局正确、各命令按预期启动
-- [ ] `bash deploy-side/tmux_scripts/kill.sh` 能清理该 session
 - [ ] 多 pane 启动时 **非 lidar pane 带 `sleep` 延迟**，避免 `roslaunch` 竞争 roscore
 - [ ] `lidar_launch.sh` 或首个 pane 中 **显式 `roscore & sleep 3`** 后再启动 `roslaunch`
 
@@ -507,26 +441,11 @@ coding agent 在交付 tmux 脚本前，必须逐项验证以下 checklist。这
 - [ ] 断言失败时 `exit 1`
 - [ ] CI pipeline 可直接调用，无需交互
 
-### Existing Scripts
+---
 
-```
-deploy-side/tmux_scripts/
-├── delta_debug.sh          # interactive session ros1-yopo-delta-debug
-├── ee_calib.sh             # interactive session ros1-yopo-ee-calib (2×2 panes)
-├── hover_debug.sh          # interactive session ros1-yopo-hover-debug (2×2 panes)
-├── kill.sh                 # list + kill all ros1-yopo-* sessions
-├── bringup.sh              # full bringup: lidar + ekf + mavros + px4ctrl
-├── sim.sh                  # interactive session ros1-yopo-sim
-├── yopo_debug_bringup.sh   # YOPO LiDAR preprocessing debug (2×2, staggered)
-└── infra_scripts/
-    ├── yopo_debug_launch.sh # roslaunch yopo_inference yopo_preprocess_debug.launch
-    └── ...
-```
-
-Run `bash deploy-side/tmux_scripts/kill.sh` to clean up all `ros1-yopo-*` sessions.
-
-### Resource
+## Resource
 
 - `~/.config/tmux/tmux.conf` — prefix C-Space, vi copy mode, Alt+Arrow pane nav
-- `deploy-side/tmux_scripts/kill.sh` — reference implementation for bulk kill
-
+- `l10n/cli/integration.py` — CLI source for all CI/CD commands
+- `l10n/core/ssh.py` — SSH/rsync connection helpers
+- `l10n/schema.py` — workspace constants (remote host, packages, excludes)

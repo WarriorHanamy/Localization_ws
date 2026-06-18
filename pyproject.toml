@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "l10n"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+integration = "l10n.cli.integration:main"
+devel = "l10n.cli.devel:main"
+
+[tool.uv]
