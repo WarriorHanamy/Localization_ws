@@ -1,0 +1,14 @@
+<launch>
+  <!-- Combined bringup: LiDAR driver + FAST-LIO SLAM (Mid360s) -->
+
+  <!-- LiDAR driver (required so it keeps both alive) -->
+  <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360s.launch" pass_all_args="false">
+    <arg name="xfer_format" value="0" />
+    <arg name="bd_list" value="000000000000000" />
+  </include>
+
+  <!-- FAST-LIO mapping (no rviz) -->
+  <include file="$(find fast_lio)/launch/mapping_mid360.launch" pass_all_args="false">
+  </include>
+
+</launch>

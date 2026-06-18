@@ -194,8 +194,8 @@ Device machine (Jetson)
 
 2. **Recommended** — one command orchestrates device machine + local docker:
    ```bash
-   uv run viz yopo
-   uv run viz yopo --bag /path/to/bag.bag
+   bun run check
+   bun run sync
    ```
 
 3. **Manual** — step by step:

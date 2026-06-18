@@ -146,7 +146,7 @@ ssh nv@192.168.55.1 "bash -lc 'sudo apt-get update -qq && sudo apt-get install -
 
 ### 1.1. Install `uv` (Python package manager)
 
-The orchestrator CLI uses `uv` for all entry points (`uv run devel`, `uv run prod`, etc.).
+The orchestrator CLI uses `bun run` for all entry points. `uv` is still used on the Jetson for Python package management.
 
 ```bash
 ssh nv@192.168.55.1 "bash -lc 'curl -fsSL https://astral.sh/uv/install.sh | bash'"
@@ -187,9 +187,9 @@ connection for bulk data transfer. WiFi (`wlan0`) provides general SSH access
 via mDNS hostname resolution.
 
 The `c5pro` orchestrator auto-detects the USB link at runtime:
-- `uv run integration` commands (sync/build/full/increment/check) **prefer USB**
+- `bun run` commands (sync/build/full/increment/check) **prefer USB**
   for fast rsync and SSH
-- `uv run prod` and `uv run viz` always use `192.168.55.1` (USB IP) for
+- `bun run <command>` commands use `192.168.55.1` (USB IP) for
   connectivity
 
 **1.3.1 Ensure USB hosts entry (devel machine):**
@@ -224,7 +224,7 @@ avahi-resolve-host-name nv-{DEVICE}.local
 ping -c1 -W1 192.168.55.1
 
 # Integration CLI should auto-detect USB
-uv run integration check
+bun run check
 ```
 
 ### 1.5. Lock WiFi to Diff* SSID
@@ -440,7 +440,7 @@ sudo make install
 After all setup steps complete, deploy the workspace from devel machine to the device:
 
 ```bash
-uv run integration sync
+bun run sync
 ```
 
 This rsyncs the repository to `/home/nv/ros1-yopo` on the device. After sync,
@@ -458,7 +458,7 @@ ssh nv@192.168.55.1 "bash -lc 'ls -la ~/ros1-yopo/pyproject.toml'"
 |------|---------|-----------------|
 | mDNS route | `avahi-resolve-host-name nv-{DEVICE}.local` | wireless IP (not 192.168.55.1 or 192.168.2.50) |
 | USB link | `ping -c1 -W1 192.168.55.1` | 0% packet loss, low latency |
-| integration routing | `uv run integration check` | `USB (192.168.55.1)` in output |
+| integration routing | `bun run check` | `USB (192.168.55.1)` in output |
 | SSH key | `ssh nv@192.168.55.1 "echo OK"` | `OK` (no password prompt) |
 | tmux | `ssh nv@192.168.55.1 "bash -lc 'tmux -V'"` | `tmux 3.0a` |
 | NTP | `ssh nv@192.168.55.1 "bash -lc 'timedatectl show --property=NTPSynchronized --value'"` | `yes` |
@@ -490,7 +490,7 @@ ssh nv@192.168.55.1 "bash -lc 'ls -la ~/ros1-yopo/pyproject.toml'"
 | WiFi keeps reconnecting | Powersave causing disconnects | Verify `nmcli -t -f 802-11-wireless.powersave connection show DiffRobot` shows `2` |
 | `find_library: liblivox_lidar_sdk_static.a` not found | Livox SDK not installed | Run `bash .agents/skills/setup-device/livox_sdk_install.sh` on device |
 | `bind failed` / `Create detection socket failed` | eth0 missing IP `192.168.2.50` (wired profile deleted) or previous livox process still holds UDP port | `sudo nmcli con up Livox-LiDAR` to restore IP; `pkill -f livox 2>/dev/null` to clear stale socket |
-| integration goes via WiFi instead of USB | USB cable disconnected or `192.168.55.1` unreachable | Connect USB-C cable; run `uv run integration check` to verify routing via USB |
+| integration goes via WiFi instead of USB | USB cable disconnected or `192.168.55.1` unreachable | Connect USB-C cable; run `bun run check` to verify routing via USB |
 | `nv-{DEVICE}.local` resolves to wrong IP (e.g. `192.168.2.50` or `172.17.0.1`) instead of WiFi IP | Process contention on port 5353 (mDNS) -- typically `nxserver.bin` (NoMachine) advertising on all interfaces | See `resource/mDNS-debug.md` |
 | wlan0 cannot associate with Diff* SSID (`ASSOC-REJECT status_code=1`, `nl80211: kernel reports: Authentication algorithm number required`) | NVIDIA BSP `rtl8822ce` driver has incomplete nl80211 auth support | Run `resource/fix-rtw88-wifi.sh` to replace with lwfinger/rtw88 driver |
 

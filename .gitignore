@@ -30,3 +30,8 @@ FAST_LIO/Log/*.txt
 
 # Virtual environment
 .venv/
+
+# Node / Bun
+node_modules/
+bun.lock
+frontend/dist/

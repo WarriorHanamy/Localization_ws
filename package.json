@@ -1,0 +1,37 @@
+{
+  "name": "l10n",
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "sync": "bun src/cli/index.ts sync",
+    "build": "bun src/cli/index.ts build",
+    "increment": "bun src/cli/index.ts increment",
+    "full": "bun src/cli/index.ts full",
+    "check": "bun src/cli/index.ts check",
+    "paths": "bun src/cli/index.ts paths",
+    "rviz": "bun src/cli/index.ts rviz",
+    "build-pkg": "bun src/cli/index.ts build-pkg",
+    "source": "bun src/cli/index.ts source",
+    "dashboard": "bun src/cli/index.ts dashboard",
+    "dev": "bun src/cli/index.ts dashboard --dev",
+    "server": "bun src/server/index.ts",
+    "help": "bun src/cli/index.ts --help"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.0.0",
+    "@react-three/fiber": "^9.0.0",
+    "mqtt": "^5.15.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.170.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "@vitejs/plugin-react": "^4.3.0"
+  }
+}

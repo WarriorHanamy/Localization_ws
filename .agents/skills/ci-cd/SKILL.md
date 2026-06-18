@@ -10,13 +10,13 @@ description: SSH-based CI/CD runtime for Jetson-localization workspace. Defines 
 ```
 Host (development)  ──USB──▶  Jetson (nv@192.168.55.1)
      │                                  │
-  uv run integration               catkin build
+  bun run               catkin build
   rsync workspace                  tmux test/run
 ```
 
 - Zero Docker in this workspace
 - Code synced to Jetson via rsync, built and tested on-device over SSH
-- `uv` manages all CLI entry points (`uv run integration ...`)
+- `uv` manages all CLI entry points (`bun run ...`)
 - All stages assume Jetson is online via USB RNDIS (`192.168.55.1`)
 
 ## SSH Target
@@ -33,7 +33,7 @@ still required, set `SSHPASS=nv` env var (auto-detected by CLI).
 All commands are exposed via `uv`:
 
 ```bash
-uv run integration <subcommand>
+bun run <subcommand>
 ```
 
 Available subcommands:
@@ -47,15 +47,17 @@ Available subcommands:
 | `full`               | rsync + remote clean catkin build             |
 | `build-pkg <pkg>`    | Build single package on remote                |
 | `paths`              | Print local/remote workspace paths            |
+| `rviz`               | Launch RViz on Jetson display (via RustDesk)  |
+| `rviz livox`         | Launch RViz with raw LiDAR point cloud        |
 
 Quick start:
 
 ```bash
-uv run integration check        # is Jetson reachable?
-uv run integration sync         # rsync source to Jetson
-uv run integration build        # clean build on Jetson
-uv run integration increment    # quick: rsync + incremental build
-uv run integration build-pkg FAST_LIO  # single-package rebuild
+bun run check        # is Jetson reachable?
+bun run sync         # rsync source to Jetson
+bun run build        # clean build on Jetson
+bun run increment    # quick: rsync + incremental build
+bun run build-pkg FAST_LIO  # single-package rebuild
 ```
 
 ---
@@ -69,8 +71,8 @@ uv run integration build-pkg FAST_LIO  # single-package rebuild
 - Build failure blocks completion
 
 ```bash
-uv run integration sync
-uv run integration build-pkg <pkg>
+bun run sync
+bun run build-pkg <pkg>
 ```
 
 ### CD (Delivery / Prod)
@@ -80,8 +82,8 @@ uv run integration build-pkg <pkg>
 - Build without test flags, launch production tmux session
 
 ```bash
-uv run integration sync
-uv run integration build
+bun run sync
+bun run build
 # Then SSH in and launch prod tmux:
 ssh nv@192.168.55.1 \
   'source /opt/ros/noetic/setup.bash && cd ~/Localization_ws && source devel/setup.bash && roslaunch ...'
@@ -93,8 +95,8 @@ ssh nv@192.168.55.1 \
 - tmux-based interactive session on Jetson
 
 ```bash
-uv run integration sync
-uv run integration build
+bun run sync
+bun run build
 ssh nv@192.168.55.1
 # Inside Jetson:
 cd ~/Localization_ws
@@ -154,8 +156,8 @@ Classify affected files as producer, consumer, launch/config, build system, or d
 6. Build on the remote Jetson via SSH:
 
    ```bash
-   uv run integration sync
-   uv run integration build-pkg <pkg>
+   bun run sync
+   bun run build-pkg <pkg>
    ```
 
 7. Report build command, result, and remaining risks.
@@ -195,6 +197,41 @@ ccache --show-stats
 
 After setup, even `rm -rf build devel && catkin build` reuses cached objects across
 clean builds.
+
+---
+
+## Visualization
+
+RViz runs on the **Jetson** (native GPU via Xorg) and is viewed remotely from the
+host via **RustDesk**. Both sides must run the same RustDesk version.
+
+### Launch RViz
+
+```bash
+bun run rviz           # FAST_LIO SLAM point clouds + odometry
+bun run rviz livox     # Raw LiDAR point cloud (/livox/lidar)
+```
+
+This does two things in one command:
+
+1. SSH into the Jetson and launch RViz in background on display `:0`
+2. Auto-connect RustDesk on the host to the Jetson's RustDesk ID via local relay
+
+The RustDesk connection window appears automatically — no manual search or
+password entry needed. A local relay server (`hbbs` + `hbbr`) runs on the host
+at `192.168.55.100` to route the connection over the USB link.
+
+### RViz Config Files
+
+| Config                          | Path                                    | Topics                                          |
+| ------------------------------- | --------------------------------------- | ----------------------------------------------- |
+| FAST_LIO visualization         | `FAST_LIO/rviz_cfg/loam_livox.rviz`     | `/cloud_registered`, `/Odometry`, `/ekf_odom`   |
+| Livox raw point cloud          | `livox_ros_driver2/config/display_point_cloud_ROS1.rviz` | `/livox/lidar`                     |
+
+### RustDesk Quick Reference
+
+See [`RUSTDESK_KNOWLEDGE.md`](../../../RUSTDESK_KNOWLEDGE.md) for version
+sync, installation, and troubleshooting details.
 
 ---
 
@@ -403,7 +440,7 @@ trap 'tmux kill-session -t "$SESSION" 2>/dev/null || true' EXIT INT TERM ERR
 tmux has-session -t "$SESSION" 2>/dev/null && tmux kill-session -t "$SESSION"
 
 tmux new-session -d -s "$SESSION" -n main
-tmux send-keys -t "$SESSION:main" 'uv run integration init' Enter
+tmux send-keys -t "$SESSION:main" 'bun run init' Enter
 sleep 0.5
 
 output=$(tmux capture-pane -t "$SESSION:main" -p)
