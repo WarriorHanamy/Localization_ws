@@ -12,14 +12,22 @@ roslaunch fast_lio fy_series_publisher.launch
 
 
 ## 2. 已知环境
-### 2.1. 将上一步建的```new.pcd```改名为```origin.pcd```
+### 2.1. 配置先验点云地图文件名
+
+将上一步建的 PCD 文件放入 `PCD/` 目录下，然后在 `config/mid360.yaml` 中修改参数：
+```yaml
+wxx:
+  initial_map_pcd_name: new1.pcd   # 改为你的PCD文件名
+```
+
+实际读取路径为 `{ROOT_DIR}/PCD/{initial_map_pcd_name}`。**该参数是全局参数**，`initial_align` 节点和 `laserMapping` 节点读取的是同一个值（见 `initial_align.cpp:459` 和 `laserMapping.cpp:1136`），更改后两边同时生效。文档中提到的 `origin.pcd` 仅为示例，实际文件名以 `mid360.yaml` 中的 `wxx/initial_map_pcd_name` 配置为准。
 
 ### 2.2. 跑代码
 
 ```bash
-# 功能：基于已知环境的点云地图origin.pcd和当前雷达静止时获得的点云进行GICP匹配，获得雷达在已知地图上的初始位置
+# 功能：基于已知环境的点云地图（路径由 mid360.yaml 中 wxx/initial_map_pcd_name 配置）和当前雷达静止时获得的点云进行GICP匹配，获得雷达在已知地图上的初始位置
 roslaunch fast_lio initial_align.launch
-# 功能：在已知环境的点云地图origin.pcd下进行定位（和incremental建图）
+# 功能：在已知环境的点云地图（路径同上）下进行定位（和incremental建图）
 roslaunch fast_lio odom_mid360_with_map.launch
 # 如果需要向地面站传输点云，则可以加入这个
 roslaunch fast_lio fy_series_publisher.launch
@@ -89,13 +97,15 @@ Lidar_wrt_Body_T:
 ```
 ## 2. **initial_align.launch**
 
-> 功能：基于已知环境的点云地图origin.pcd和当前雷达静止时获得的点云进行GICP匹配，获得雷达在已知地图上的初始位置
+> 功能：基于已知环境的点云地图和当前雷达静止时获得的点云进行GICP匹配，获得雷达在已知地图上的初始位置。
+> 
+> 地图文件路径由 `config/mid360.yaml` 中的 `wxx/initial_map_pcd_name` 决定（默认 `new1.pcd`），构造为 `{ROOT_DIR}/PCD/{文件名}`。该参数与 `laserMapping` 全局共用，修改一处同时影响两个节点的先验地图加载路径。
 
 
 * 输入：
     * livox雷达输出的原始点云: /livox/lidar
     * livox雷达输出的原始IMU(用于重力对齐以降低点云匹配的难度): /livox/imu
-    * 已知环境的点云地图文件: origin.pcd
+    * 已知环境的点云地图文件: 由 `config/mid360.yaml` 中 `wxx/initial_map_pcd_name` 配置（默认 `new1.pcd`，路径 `PCD/new1.pcd`）。该参数与 `laserMapping` 共用同一全局参数，确保两个节点读取同一份地图。
 * 输出：
     * 机体（不是雷达）的初始里程计：/initial_odom_for_lio
     * 与已知环境匹配对齐后的点云，即雷达在已知地图的世界坐标系下的点云：/initial_cloud_from_odom
@@ -130,7 +140,7 @@ zty:
 
 ## 3. **odom_mid360_with_map.launch**
 > 功能：
-在**已知环境**的点云地图origin.pcd下进行定位（和incremental建图）
+在**已知环境**的点云地图下进行定位（和incremental建图），地图文件路径由 `config/mid360.yaml` 中的 `wxx/initial_map_pcd_name` 决定（默认 `new1.pcd`）
 
 > **NOTE**： 必须接受到```initial_align.launch```算出的机体在已知点云下的初始位姿topoc : ```/initial_odom_for_lio```
 
