@@ -1,5 +1,5 @@
 import type { CPUUsageData } from "../lib/ros-types";
-import { useRosTopic } from "../hooks/useRosTopic";
+import { useRosTopic, useConnectionStatus } from "../hooks/useRosTopic";
 
 const CORE_COLORS = [
   "#e6194b", "#3cb44b", "#ffe119", "#4363d8",
@@ -9,8 +9,10 @@ const CORE_COLORS = [
 
 export function CpuGauge(): React.JSX.Element {
   const cpu = useRosTopic<CPUUsageData>("/cpu_usage");
+  const ws = useConnectionStatus();
 
   if (!cpu?.usage?.length) {
+    const msg = ws === "connected" ? "CPU — waiting..." : "CPU — offline";
     return (
       <div style={{
         position: "absolute", top: 12, right: 12,
@@ -18,7 +20,7 @@ export function CpuGauge(): React.JSX.Element {
         borderRadius: 6, fontSize: 12, color: "#666",
         fontFamily: "monospace",
       }}>
-        CPU — waiting for data...
+        {msg}
       </div>
     );
   }

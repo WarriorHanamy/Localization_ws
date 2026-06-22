@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ServerMessage, ConnectionStatus } from "../lib/ros-types";
+import { globalRecorder } from "../store/Recorder";
 
 const WS_URL = `ws://${window.location.hostname}:3000/ws`;
 
@@ -31,6 +32,7 @@ function connect(): void {
       const msg: ServerMessage = JSON.parse(event.data);
       if (msg.type === "heartbeat") return;
       if (msg.topic) {
+        globalRecorder.push(msg.topic, msg.data, msg.ts);
         store = { ...store, [msg.topic]: { ts: msg.ts, data: msg.data } };
         const cbs = listeners.get(msg.topic);
         if (cbs) {

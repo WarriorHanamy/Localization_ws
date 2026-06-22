@@ -14,14 +14,14 @@ export interface DashboardArgs {
   launchFile?: string;
 }
 
-function envSetup(): string {
+export function envSetup(): string {
   return [
     `source /opt/ros/${ROS_DISTRO}/setup.bash`,
     `source ${REMOTE_PATH}/devel/setup.bash`,
   ].join(" && ");
 }
 
-async function checkRoscore(): Promise<boolean> {
+export async function checkRoscore(): Promise<boolean> {
   const { exitCode } = await runSSH(
     `${envSetup()} && rostopic list >/dev/null 2>&1`,
     false,
@@ -37,7 +37,7 @@ async function checkNodeRunning(node: string): Promise<boolean> {
   return exitCode === 0;
 }
 
-async function checkNodesRunning(names: string[]): Promise<boolean> {
+export async function checkNodesRunning(names: string[]): Promise<boolean> {
   for (const name of names) {
     if (!(await checkNodeRunning(name))) return false;
   }
@@ -51,13 +51,13 @@ async function checkAnyNodeRunning(names: string[]): Promise<boolean> {
   return false;
 }
 
-async function startRoscore(): Promise<void> {
+export async function startRoscore(): Promise<void> {
   console.log("[dashboard] Starting roscore on Jetson ...");
   await runSSHDetached(`bash -c '${envSetup()} && roscore &'`);
   await Bun.sleep(3000);
 }
 
-async function startSLAM(): Promise<void> {
+export async function startSLAM(): Promise<void> {
   console.log("[dashboard] Starting LiDAR driver + FAST-LIO mapping on Jetson ...");
 
   const slamCmd = [
@@ -70,7 +70,17 @@ async function startSLAM(): Promise<void> {
 
 const ALL_LAUNCHED_NODES = ["/laserMapping", "/cpu_monitor", "/livox_lidar_publisher2"];
 
-async function killRemoteNodes(): Promise<void> {
+export async function startMqttBridge(): Promise<void> {
+  console.log("[dashboard] Starting MQTT bridge on Jetson ...");
+  const bridgeCmd = [
+    envSetup(),
+    `python3 ${REMOTE_PATH}/src/mqtt_bridge.py > /dev/null 2>&1 &`,
+  ].join(" && ");
+  await runSSHDetached(bridgeCmd);
+  await Bun.sleep(2000);
+}
+
+export async function killRemoteNodes(): Promise<void> {
   console.log("[dashboard] Cleaning up remote nodes ...");
   const nodeKills = ALL_LAUNCHED_NODES.map(
     (n) => `rosnode kill ${$.escape(n)} 2>/dev/null || true`,
@@ -114,13 +124,7 @@ export async function cmdDashboard(args: DashboardArgs): Promise<void> {
   }
 
   // Start MQTT bridge (ROS → Mosquitto)
-  console.log("[dashboard] Starting MQTT bridge on Jetson ...");
-  const bridgeCmd = [
-    envSetup(),
-    `python3 ${REMOTE_PATH}/src/mqtt_bridge.py > /dev/null 2>&1 &`,
-  ].join(" && ");
-  await runSSHDetached(bridgeCmd);
-  await Bun.sleep(2000);
+  await startMqttBridge();
 
   // Register cleanup on exit
   const cleanup = () => {

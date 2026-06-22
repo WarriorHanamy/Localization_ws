@@ -51,6 +51,7 @@ export async function startMqttRelay(
     "l10n/path",
     "l10n/ekf_odom",
     "l10n/prior_cloud",
+    "l10n/combined_cloud",
     "l10n/rc_state",
     "l10n/bridge_status",
   ];
@@ -72,6 +73,7 @@ export async function startMqttRelay(
       "l10n/path": "/path",
       "l10n/ekf_odom": "/ekf_quat/ekf_odom",
       "l10n/prior_cloud": "/prior_local_cloud",
+      "l10n/combined_cloud": "/cloud_registered_with_prior",
       "l10n/rc_state": "/rc_state",
     };
 
@@ -80,7 +82,7 @@ export async function startMqttRelay(
 
     // Cloud topics: binary float32 array; others: JSON string
     let data: unknown;
-    if (topic === "l10n/cloud" || topic === "l10n/prior_cloud") {
+    if (topic === "l10n/cloud" || topic === "l10n/prior_cloud" || topic === "l10n/combined_cloud") {
       // Convert binary to number array for JSON serialization
       const buf = Buffer.from(payload);
       const floats: number[] = [];

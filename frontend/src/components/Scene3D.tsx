@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid } from "@react-three/drei";
-import { PointCloud, PriorCloud } from "./PointCloud";
+import { PointCloud, PriorCloud, CombinedCloud } from "./PointCloud";
 import { OdometryArrow, EkfArrow } from "./OdometryArrow";
 import { TrajectoryLine } from "./TrajectoryLine";
 
@@ -38,6 +38,7 @@ export function Scene3D(): React.JSX.Element {
         <EkfArrow />
         <PriorCloud />
         <PointCloud />
+        <CombinedCloud />
 
         {/* Controls */}
         <OrbitControls

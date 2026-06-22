@@ -68,7 +68,6 @@ def msg_to_dict(msg):
 
 def odom_cb(msg):
     try:
-        print("[mqtt_bridge] odom_cb called! seq=%d" % msg.header.seq, flush=True)
         payload = json.dumps(
             {
                 "header": {
@@ -80,17 +79,19 @@ def odom_cb(msg):
                 },
                 "child_frame_id": msg.child_frame_id,
                 "pose": {
-                    "position": {
-                        "x": msg.pose.pose.position.x,
-                        "y": msg.pose.pose.position.y,
-                        "z": msg.pose.pose.position.z,
-                    },
-                    "orientation": {
-                        "x": msg.pose.pose.orientation.x,
-                        "y": msg.pose.pose.orientation.y,
-                        "z": msg.pose.pose.orientation.z,
-                        "w": msg.pose.pose.orientation.w,
-                    },
+                    "pose": {
+                        "position": {
+                            "x": msg.pose.pose.position.x,
+                            "y": msg.pose.pose.position.y,
+                            "z": msg.pose.pose.position.z,
+                        },
+                        "orientation": {
+                            "x": msg.pose.pose.orientation.x,
+                            "y": msg.pose.pose.orientation.y,
+                            "z": msg.pose.pose.orientation.z,
+                            "w": msg.pose.pose.orientation.w,
+                        },
+                    }
                 },
             }
         ).encode("utf-8")
@@ -201,6 +202,12 @@ def main():
         "/prior_local_cloud",
         PointCloud2,
         point_cloud_cb("l10n/prior_cloud"),
+        queue_size=5,
+    )
+    rospy.Subscriber(
+        "/cloud_registered_with_prior",
+        PointCloud2,
+        point_cloud_cb("l10n/combined_cloud"),
         queue_size=5,
     )
     rospy.Subscriber("/rc_state", rc_state, rc_state_cb, queue_size=5)

@@ -4,6 +4,7 @@ import { cmdCheck } from "./check";
 import { cmdRviz, type RvizArgs } from "./rviz";
 import { cmdSource } from "./devel";
 import { cmdDashboard, type DashboardArgs } from "./dashboard";
+import { cmdSmoke } from "./smoke";
 import { WORKSPACE_PKGS, REMOTE_PATH } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
@@ -23,6 +24,8 @@ Commands:
   dashboard         start web dashboard (auto-launch SLAM + serve frontend)
   dashboard --dev   start in dev mode (Vite HMR proxy)
   dashboard --no-launch  skip auto-launching SLAM pipeline
+  smoke             run FAST-LIO smoke test checklist
+  smoke --level slam  only check SLAM layer
   help              show this message
 
 Presets for rviz: fast-lio (default), livox
@@ -95,6 +98,9 @@ async function main() {
       await cmdDashboard({ noLaunch });
       break;
     }
+    case "smoke":
+      await cmdSmoke(args);
+      break;
     case "help":
     case "--help":
     case "-h":
