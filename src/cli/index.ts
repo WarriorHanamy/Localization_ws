@@ -5,7 +5,11 @@ import { cmdRviz, type RvizArgs } from "./rviz";
 import { cmdSource } from "./devel";
 import { cmdDashboard, type DashboardArgs } from "./dashboard";
 import { cmdSmoke } from "./smoke";
-import { WORKSPACE_PKGS, REMOTE_PATH } from "../core/config";
+import { cmdDockerBuild } from "./docker-build";
+import { cmdDockerStart } from "./docker-start";
+import { cmdDockerShell } from "./docker-shell";
+import { cmdDockerSmoke } from "./docker-smoke";
+import { WORKSPACE_PKGS, REMOTE_PATH, RECIPES } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
 const USAGE = `
@@ -26,6 +30,16 @@ Commands:
   dashboard --no-launch  skip auto-launching SLAM pipeline
   smoke             run FAST-LIO smoke test checklist
   smoke --level slam  only check SLAM layer
+
+Docker commands:
+  docker-dbuild      build fastlio-jetson image on Jetson (SSH)
+  docker-start       start a named container for a recipe
+  docker-shell       exec bash into a running container
+  docker-smoke       smoke-test a running container
+
+Recipes for docker-start:
+${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\n")}
+
   help              show this message
 
 Presets for rviz: fast-lio (default), livox
@@ -100,6 +114,19 @@ async function main() {
     }
     case "smoke":
       await cmdSmoke(args);
+      break;
+    case "docker-dbuild":
+    case "docker-build":
+      await cmdDockerBuild();
+      break;
+    case "docker-start":
+      await cmdDockerStart(args);
+      break;
+    case "docker-shell":
+      await cmdDockerShell(args);
+      break;
+    case "docker-smoke":
+      await cmdDockerSmoke(args);
       break;
     case "help":
     case "--help":

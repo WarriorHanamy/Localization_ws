@@ -1,0 +1,4 @@
+interface:
+  display_name: "NV Host Proxy"
+  short_description: "Route Jetson internet traffic through the host proxy"
+  default_prompt: "Use $nv-network-proxy to configure and verify host-proxied internet access on the Jetson device."

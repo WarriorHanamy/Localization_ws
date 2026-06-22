@@ -17,6 +17,10 @@
     "server": "bun src/server/index.ts",
     "view:fastlio": "bun run src/cli/view-fastlio.ts",
     "smoke": "bun src/cli/index.ts smoke",
+    "docker-dbuild": "bun src/cli/index.ts docker-dbuild",
+    "docker-start": "bun src/cli/index.ts docker-start",
+    "docker-shell": "bun src/cli/index.ts docker-shell",
+    "docker-smoke": "bun src/cli/index.ts docker-smoke",
     "help": "bun src/cli/index.ts --help"
   },
   "dependencies": {

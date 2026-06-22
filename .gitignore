@@ -27,6 +27,8 @@ FAST_LIO/Log/*.txt
 *.o
 *.so
 *.a
+!bringup/resource/livox_sdk2/*.so
+!bringup/resource/livox_sdk2/*.a
 
 # Virtual environment
 .venv/

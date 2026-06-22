@@ -142,6 +142,55 @@ function fmtStatus(pass: boolean, actual: string, expect: string): string {
   return `${col}${mark}${rst} ${actual.padEnd(14)} (expected ${expect})`;
 }
 
+async function ensureNativeDriver(): Promise<void> {
+  console.log("\n\x1b[1;33m[pre-flight] Ensuring native LiDAR driver is healthy...\x1b[0m");
+
+  const ros = `source /opt/ros/${ROS_DISTRO}/setup.bash`;
+  const rosDev = `${ros} && source ${REMOTE_PATH}/devel/setup.bash 2>/dev/null`;
+
+  // Step 1 — kill zombie livox processes
+  await runSSH("sudo -n pkill -9 -f livox_ros_driver2 2>/dev/null || true; sleep 2; echo KILL_DONE", false);
+
+  // Step 2 — ensure roscore is running
+  { const { stdout } = await runSSH(`${ros} && timeout 3 rostopic list 2>&1 | grep -q /rosout && echo ROS_OK || echo ROS_NO`, false);
+    if (!stdout.includes("ROS_OK")) {
+      await runSSH(`${ros} && roscore > /tmp/roscore.log 2>&1 &`, false);
+      await new Promise(r => setTimeout(r, 3000));
+    } }
+
+  // Step 3 — read lidar IP from config
+  const { stdout: lidarIpRaw } = await runSSH(`jq -r '.lidar_configs[0].ip // empty' ${REMOTE_PATH}/bringup/config/MID360s_config.json 2>/dev/null || echo 192.168.2.88`, false);
+  const lidarIp = lidarIpRaw.trim() || "192.168.2.88";
+
+  // Step 4 — check if driver is already publishing IMU
+  {
+    const { stdout } = await runSSH(`${ros} && timeout 4 rostopic hz /livox/imu --window=20 2>&1 | grep "average rate" | tail -1 || echo NO_IMU`, false);
+    const m = stdout.match(/average rate:\s*([\d.]+)/);
+    if (m) {
+      console.log(`  \x1b[32mOK\x1b[0m native driver alive (IMU ${parseFloat(m[1]).toFixed(0)} Hz, lidar=${lidarIp})`);
+      return;
+    }
+  }
+
+  // Step 5 — start driver
+  console.log(`  Starting native driver for lidar ${lidarIp}...`);
+  await runSSH(`${ros} && rosparam delete /user_config_path 2>/dev/null; rosparam set /user_config_path ${REMOTE_PATH}/bringup/config/MID360s_config.json; rosparam set /xfer_format 0; rosparam set /multi_topic 0; rosparam set /data_src 0; rosparam set /cmdline_str ${lidarIp}; rosparam set /frame_id livox_frame`, false);
+  await runSSH(`${rosDev} && nohup rosrun livox_ros_driver2 livox_ros_driver2_node ${lidarIp} __name:=livox_lidar_publisher2 > /tmp/livox_driver.log 2>&1 &`, false);
+  await new Promise(r => setTimeout(r, 9000));
+
+  // Step 6 — verify
+  {
+    const { stdout } = await runSSH(`${ros} && timeout 4 rostopic hz /livox/imu --window=20 2>&1 | grep "average rate" | tail -1 || echo NO_IMU`, false);
+    const m = stdout.match(/average rate:\s*([\d.]+)/);
+    if (m) {
+      console.log(`  \x1b[32mOK\x1b[0m driver started (IMU ${parseFloat(m[1]).toFixed(0)} Hz)`);
+      return;
+    }
+  }
+
+  console.log("  \x1b[31mFAIL\x1b[0m driver did not start — check /tmp/livox_driver.log on Jetson");
+}
+
 export async function cmdSmoke(args: string[]): Promise<void> {
   const filterLevel = args.includes("--level") ? args[args.indexOf("--level") + 1] : null;
   const items = filterLevel
@@ -153,6 +202,10 @@ export async function cmdSmoke(args: string[]): Promise<void> {
   }
 
   const reachable = await isUSBReachable();
+
+  if (reachable && (!filterLevel || filterLevel === "driver")) {
+    await ensureNativeDriver();
+  }
   let currentLevel = "";
   const results: CheckResult[] = [];
 
