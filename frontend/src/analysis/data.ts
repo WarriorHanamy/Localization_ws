@@ -16,7 +16,7 @@ export interface ParamDef {
   type: string;
   defaultValue: string;
   desc: string;
-  math: string;
+  math?: string;
   refs: CodeRef[];
 }
 
@@ -592,6 +592,244 @@ const C6_MON: Category = {
   dataFlowLabel: "/proc/stat → cpu_monitor 节点读取 → 滤波器 (SMA/EMA/LP) → CPUUsage.msg → /cpu_usage topic",
 };
 
+const C7_TOPICS: Category = {
+  id: "topics",
+  title: "Output Topics",
+  icon: "📡",
+  summary:
+    "FAST-LIO 进程内全局变量 ikdtree (KD_TREE<PointType>) 通过 ROS topic 发布出去，mqtt_bridge 条件订阅后经 Mosquitto → WS 到达前端。每个 topic 标注了 ROS 消息类型、C++ 内部数据类型、典型频率。🔵 = MQTT 转发到前端，⚪ = ROS only。",
+  params: [
+    {
+      name: "/Odometry",
+      yamlPath: "FAST_LIO · nav_msgs/Odometry",
+      type: "nav_msgs/Odometry",
+      defaultValue: "~10 Hz · 🔵 前端箭头",
+      desc: "FAST-LIO 估计的当前里程计位姿（position + quaternion）。前端橙色箭头和轨迹线即消费此 topic。",
+      math: "来源: state_ikfom · rot  +  state_ikfom · pos  →  tf::Transform  →  Odometry msg",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 857, desc: "publish_odometry()" },
+        { file: "FAST_LIO/include/use-ikfom.hpp", line: 13, desc: "state_ikfom: pos + rot" },
+        { file: "src/mqtt_bridge.py", line: 193, desc: "MQTT → l10n/odometry (JSON)" },
+      ],
+    },
+    {
+      name: "/cloud_registered",
+      yamlPath: "FAST_LIO · sensor_msgs/PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "~10 Hz · 🔵 绿色点云",
+      desc: "世界坐标系下配准后的当前 LiDAR 扫描帧。IMU 去畸变 → ikd-tree ICP → world 系。MQTT bridge 以 binary float32 转发。",
+      math: "PointType = pcl::PointXYZINormal\n字段: x, y, z, intensity, curvature (=timestamp offset ms)\n变换: p_world = state_point.rot · (offset_R_L_I · p_lidar + offset_T_L_I) + state_point.pos",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1333, desc: "pubLaserCloudFull" },
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 225, desc: "pointBodyToWorld_ikfom()" },
+        { file: "src/mqtt_bridge.py", line: 194, desc: "MQTT → l10n/cloud (binary, 0.05m voxel)" },
+      ],
+    },
+    {
+      name: "/cloud_registered_with_prior",
+      yamlPath: "FAST_LIO (wxx) · PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "~10 Hz · 🔵 橙色点云",
+      desc: "当前帧 + 先验局部截球点云的合并。若 prior_local_enable=false 则不发布。",
+      math: "PointCloudXYZI::Ptr 拼接: *combined = *laserCloudWorld + *prior_local_cache_\n底层类型: pcl::PointXYZI",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1340, desc: "pubLaserCloudWithPrior" },
+        { file: "src/mqtt_bridge.py", line: 206, desc: "MQTT → l10n/combined_cloud" },
+      ],
+    },
+    {
+      name: "/prior_local_cloud",
+      yamlPath: "FAST_LIO (wxx) · PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "~2 Hz 生成 · 🔵 红色点云",
+      desc: "wxx 先验地图截球。后台线程 prior_local_thread() 从降采样的初始 PCD 中 radiusSearch。",
+      math: "prior_map_ds_cloud_  →  prior_kdtree_.radiusSearch(pos, prior_local_radius)\n→  prior_local_cache_ (mutex 保护)  →  pubPriorLocalCloud",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 654, desc: "prior_local_thread()" },
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 167, desc: "prior_map_ds_cloud_ (降采样副本)" },
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1342, desc: "pubPriorLocalCloud" },
+      ],
+    },
+    {
+      name: "/cloud_registered_body",
+      yamlPath: "FAST_LIO · PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "~10 Hz · ⚪ 仅 ROS",
+      desc: "body (IMU) 坐标系下的当前扫描点云，不做世界系变换。",
+      math: "p_body = offset_R_L_I · p_lidar + offset_T_L_I  (不乘 state_point.rot)",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 270, desc: "RGBpointBodyLidarToIMU()" },
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1337, desc: "pubLaserCloudFull_body" },
+      ],
+    },
+    {
+      name: "/cloud_registered_no_point_filter",
+      yamlPath: "FAST_LIO (wxx) · PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "~10 Hz · ⚪ 仅 ROS",
+      desc: "未隔点降采样的原始配准点云。点数 = 原始扫描帧点数。",
+      math: "feats_undistort (原始) → 跳过 point_filter_num 隔点 → 直接发布",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1331, desc: "pubLaserCloudFullNoPointFilter" },
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1425, desc: "feats_undistort_no_point_filter swap" },
+      ],
+    },
+    {
+      name: "/circular_cloud_registered",
+      yamlPath: "FAST_LIO · PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "~10 Hz · ⚪ debug",
+      desc: "归一化球面投影 debug 点云。各点归一化到 debug_circular_cloud_radius 球面后变换到世界系。",
+      math: "p_circular = normalize(p_lidar) × radius  →  RGBpointBodyToWorld",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 605, desc: "publish_debug_circular_frame_world()" },
+      ],
+    },
+    {
+      name: "/cloud_effected",
+      yamlPath: "FAST_LIO · PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "~10 Hz · ⚪ (注释掉)",
+      desc: "ICP 使用的有效特征点。当前代码已注释 publish_effect_world 调用。",
+      math: "point_selected_surf[i] = true 的点 → laserCloudOri (body 系)",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 819, desc: "publish_effect_world() (commented)" },
+      ],
+    },
+    {
+      name: "/Laser_map",
+      yamlPath: "FAST_LIO · PointCloud2",
+      type: "sensor_msgs/PointCloud2",
+      defaultValue: "按需 · ⚪ 仅 ROS",
+      desc: "全局 ikd-tree 展平后的点云地图。if(0) 块控制，默认关闭 (展平开销大)。",
+      math: "ikdtree.flatten(Root_Node, PCL_Storage) → featsFromMap → publish_map()",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1476, desc: "if(0) flatten + publish" },
+      ],
+    },
+    {
+      name: "/path",
+      yamlPath: "FAST_LIO · nav_msgs/Path",
+      type: "nav_msgs/Path",
+      defaultValue: "~1 Hz · 🔵 轨迹线",
+      desc: "SLAM 轨迹。每 10 帧采样一次追加到 path.poses。前端青色轨迹线。",
+      math: "path.poses.push_back(state_point.pos)  ·  jjj % 10 == 0",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 896, desc: "publish_path()" },
+        { file: "src/mqtt_bridge.py", line: 198, desc: "MQTT → l10n/path (JSON)" },
+      ],
+    },
+    {
+      name: "/PoseStamped",
+      yamlPath: "FAST_LIO · geometry_msgs/PoseStamped",
+      type: "geometry_msgs/PoseStamped",
+      defaultValue: "~10 Hz · ⚪ 仅 ROS",
+      desc: "与 /Odometry 同源的 pose stamped。格式不同，内容相同。",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1352, desc: "pubPoseStampedAftMapped" },
+      ],
+    },
+    {
+      name: "/cpu_usage",
+      yamlPath: "FAST_LIO (wxx) · fast_lio/CPUUsage",
+      type: "fast_lio/CPUUsage",
+      defaultValue: "~10 Hz · 🔵 CPU 面板",
+      desc: "cpu_monitor 节点发布的各核心占用率。前端右上角 CPU 柱状图。",
+      math: "float32[] cpu_usage  →  SMA/EMA/LP 滤波",
+      refs: [
+        { file: "FAST_LIO/src/cpu_monitor.cpp", line: 1, desc: "cpu_monitor 节点" },
+        { file: "src/mqtt_bridge.py", line: 197, desc: "MQTT → l10n/cpu (JSON)" },
+      ],
+    },
+    {
+      name: "/LioDebug",
+      yamlPath: "FAST_LIO · fast_lio/LioDebug",
+      type: "fast_lio/LioDebug",
+      defaultValue: "~10 Hz · ⚪ 仅 ROS",
+      desc: "IKFoM 内部调试：IMU bias、重力向量、各阶段耗时 (ms)、降采样点数。",
+      math: "debug_msg_.bias_acc/gyr  ·  debug_msg_.gravity  ·  debug_msg_.ICP_ms 等",
+      refs: [
+        { file: "FAST_LIO/include/use-ikfom.hpp", line: 12, desc: "state_ikfom: bg, ba, grav" },
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1562, desc: "debug_msg_ 填充 + pubLioDebug" },
+      ],
+    },
+    {
+      name: "/tf",
+      yamlPath: "FAST_LIO · tf2_msgs/TFMessage",
+      type: "tf2_msgs/TFMessage",
+      defaultValue: "~10 Hz · ⚪ 仅 ROS",
+      desc: "world → body 坐标系变换。tf::TransformBroadcaster 发布。",
+      math: "transform = (state_point.pos, state_point.rot)  →  br.sendTransform",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 882, desc: "br.sendTransform(transform)" },
+      ],
+    },
+  ],
+  dataFlowLabel:
+    "FAST-LIO → ROS topic → mqtt_bridge.py 条件订阅 (🔵) → Mosquitto → Bun relay → WS → 前端 React 组件渲染",
+};
+
+const C8_MEMORY: Category = {
+  id: "memory",
+  title: "进程内内存模型",
+  icon: "🧠",
+  summary:
+    "FAST-LIO 和 incremental_map_publisher 如何在同一进程/跨节点间共享地图数据。没有 shared_ptr 或 MapInterface 抽象——都是裸全局变量或 ROS topic 序列化。",
+  params: [
+    {
+      name: "ikdtree — FAST-LIO 全局增量地图",
+      yamlPath: "laserMapping.cpp:176",
+      type: "KD_TREE<PointType>",
+      defaultValue: "栈上全局变量 · 进程内直访",
+      desc: "laserMapping 节点内唯一的增量 KD-tree 地图。所有函数 (h_share_model, map_incremental, lasermap_fov_segment) 通过全局名 ikdtree 直接访问。不是 shared_ptr，无抽象接口。点云数据以 ROS topic 向外发布。",
+      math: "PointType = pcl::PointXYZINormal\n字段: x, y, z, intensity, curvature, normal_x, normal_y, normal_z\n存储: 增量 KD-tree, 支持 Add_Points / Delete_Point_Boxes / Nearest_Search / flatten",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 176, desc: "KD_TREE<PointType> ikdtree;" },
+        { file: "FAST_LIO/include/ikd-Tree/ikd_Tree.h", line: 1, desc: "KD_TREE 模板定义" },
+        { file: "FAST_LIO/include/preprocess.h", line: 10, desc: "typedef pcl::PointXYZINormal PointType" },
+      ],
+    },
+    {
+      name: "prior_map_ds_cloud_ — 先验降采样副本",
+      yamlPath: "laserMapping.cpp:167",
+      type: "PointCloudXYZI::Ptr (shared_ptr)",
+      defaultValue: "进程内 · prior_local_thread 独读",
+      desc: "初始 PCD 地图的 VoxelGrid 降采样副本。独立于 ikdtree (全分辨率) 存储，专门供 prior_local_thread 做 radiusSearch 截球。通过 prior_kdtree_ (pcl::KdTreeFLANN) 索引。",
+      math: "prior_map_ds_cloud_ = downSizePrior.filter(featsFromMap)\nprior_local_leaf_ 控制体素边长",
+      refs: [
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 167, desc: "prior_map_ds_cloud_ 声明" },
+        { file: "FAST_LIO/src/laserMapping.cpp", line: 1282, desc: "downSizePrior 降采样" },
+      ],
+    },
+    {
+      name: "GridMap — 滚动体素网格地图",
+      yamlPath: "rolling_map_node.hpp",
+      type: "GridMap · unordered_map<uint32_t,bool>",
+      defaultValue: "RollingMapNode 成员 · 跨节点不可见",
+      desc: "incremental_map_publisher 的体素占位网格。内部是 hash map，key 编码为 z*sx*sy+y*sx+x (32-bit)。由 RollingGridMapManager 管理 3×3×3=27 个滑动窗口 GridMap 实例。窗口滑动时自动 saveToFile/loadFromFile 持久化到磁盘。",
+      math: "Key = z × size_x × size_y + y × size_x + x  (uint32_t)\n窗口大小: 3×3×3 = 27 GridMap\n持久化: /home/nv/.resource/map_files/<index>",
+      refs: [
+        { file: "incremental_map_publisher/include/rolling_map/grid_map.hpp", line: 1, desc: "GridMap 类定义" },
+        { file: "incremental_map_publisher/include/rolling_map/rolling_grid_map_manager.hpp", line: 1, desc: "RollingGridMapManager" },
+        { file: "incremental_map_publisher/include/rolling_map/rolling_map_node.hpp", line: 1, desc: "RollingMapNode 拥有 mapManager_" },
+      ],
+    },
+    {
+      name: "跨节点数据通路 (无指针共享)",
+      yamlPath: "ROS topic + 磁盘文件",
+      type: "sensor_msgs::PointCloud2 序列化",
+      defaultValue: "无 shared_ptr · 无零拷贝",
+      desc: "FAST-LIO → incremental_map_publisher 通过 /cloud_registered + /Odometry 两个 ROS topic 传递点云和位姿。GridMap 滑动窗口内通过 saveToFile/loadFromFile 持久化到 /home/nv/.resource/map_files/。不通过指针或共享内存跨节点传递地图数据。",
+      math: "ikdtree → publish_frame_world() → /cloud_registered (PointCloud2) →\nrolling_map_publisher 订阅 → GridMap 插入点 → 发布 /communication/grid_PC_vec",
+      refs: [
+        { file: "incremental_map_publisher/launch/rolling_map_publisher.launch", line: 1, desc: "rolling_map_publisher 节点启动" },
+        { file: "incremental_map_publisher/include/rolling_map/rolling_map_node.hpp", line: 1, desc: "订阅 /cloud_registered + /Odometry" },
+      ],
+    },
+  ],
+  dataFlowLabel: "全局变量 ikdtree / prior_map_ds_cloud_ (进程内) → ROS topic 序列化 → 其他节点 → GridMap 组织 → 磁盘持久化",
+};
+
 export const CATEGORIES: Category[] = [
   C1_COORD,
   C2_MAP,
@@ -599,4 +837,6 @@ export const CATEGORIES: Category[] = [
   C4_CPU,
   C5_AD,
   C6_MON,
+  C7_TOPICS,
+  C8_MEMORY,
 ];

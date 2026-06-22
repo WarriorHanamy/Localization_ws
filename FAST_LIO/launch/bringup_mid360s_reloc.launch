@@ -1,0 +1,20 @@
+<launch>
+  <!-- Combined bringup: LiDAR driver + relocalization + FAST-LIO SLAM (Mid360s) -->
+
+  <!-- LiDAR driver -->
+  <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360s.launch" pass_all_args="false">
+    <arg name="xfer_format" value="0" />
+    <arg name="bd_list" value="000000000000000" />
+  </include>
+
+  <!-- FAST-LIO mapping with prior map (loads PCD, waits for /initial_odom_for_lio) -->
+  <include file="$(find fast_lio)/launch/mapping_mid360_reloc.launch" pass_all_args="false">
+  </include>
+
+  <!-- Global relocalization: scan-to-prior-map alignment -->
+  <rosparam command="load" file="$(find fast_lio)/config/initial_align.yaml" />
+  <param name="wxx/initial_align/Init_Body_pos_x" type="double" value="0.0" />
+  <param name="wxx/initial_align/Init_Body_pos_y" type="double" value="0.0" />
+  <param name="wxx/initial_align/Init_Body_pos_z" type="double" value="0.0" />
+  <node pkg="fast_lio" type="initial_align" name="initial_align" output="screen" />
+</launch>

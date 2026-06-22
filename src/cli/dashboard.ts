@@ -4,6 +4,7 @@ import { REMOTE_PATH, ROS_DISTRO } from "../core/config";
 
 const LAUNCH_NAMES = {
   slam: "fast_lio bringup_mid360s.launch",
+  reloc: "fast_lio bringup_mid360s_reloc.launch",
   bridge: `src/mqtt_bridge.py`,
 };
 
@@ -57,18 +58,19 @@ export async function startRoscore(): Promise<void> {
   await Bun.sleep(3000);
 }
 
-export async function startSLAM(): Promise<void> {
-  console.log("[dashboard] Starting LiDAR driver + FAST-LIO mapping on Jetson ...");
+export async function startSLAM(reloc = false): Promise<void> {
+  const launchName = reloc ? LAUNCH_NAMES.reloc : LAUNCH_NAMES.slam;
+  console.log(`[dashboard] Starting ${reloc ? "RELOCALIZATION + " : ""}LiDAR driver + FAST-LIO mapping on Jetson ...`);
 
   const slamCmd = [
     envSetup(),
-    `roslaunch ${LAUNCH_NAMES.slam} > /dev/null 2>&1 &`,
+    `roslaunch ${launchName} > /dev/null 2>&1 &`,
   ].join(" && ");
   await runSSHDetached(slamCmd);
   await Bun.sleep(4000);
 }
 
-const ALL_LAUNCHED_NODES = ["/laserMapping", "/cpu_monitor", "/livox_lidar_publisher2"];
+const ALL_LAUNCHED_NODES = ["/laserMapping", "/cpu_monitor", "/livox_lidar_publisher2", "/initial_align"];
 
 export async function startMqttBridge(): Promise<void> {
   console.log("[dashboard] Starting MQTT bridge on Jetson ...");

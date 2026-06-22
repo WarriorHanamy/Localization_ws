@@ -65,6 +65,16 @@ export function NavBar({ view }: NavBarProps) {
       >
         Code Analysis
       </a>
+      <a
+        href="#compare"
+        style={{
+          color: view === "compare" ? "#88ccff" : "#667",
+          textDecoration: "none",
+          fontWeight: view === "compare" ? 600 : 400,
+        }}
+      >
+        Compare
+      </a>
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
         {view === "dashboard" && ws === "connected" && <RecordingButton />}

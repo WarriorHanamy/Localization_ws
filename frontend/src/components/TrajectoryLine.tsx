@@ -22,20 +22,20 @@ export function TrajectoryLine(): React.JSX.Element {
 
     if (lineRef.current) {
       const geo = lineRef.current.geometry as THREE.BufferGeometry;
-      const pos = geo.attributes.position as THREE.BufferAttribute;
       const arr = positionsRef.current;
-      if (pos.count !== arr.length / 3) {
-        geo.setAttribute(
-          "position",
-          new THREE.BufferAttribute(new Float32Array(arr), 3),
-        );
-        geo.setDrawRange(0, arr.length / 3);
+      const pointCount = arr.length / 3;
+      const pos = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
+
+      if (!pos || pos.count !== pointCount) {
+        const nextPosition = new THREE.BufferAttribute(new Float32Array(arr), 3);
+        geo.setAttribute("position", nextPosition);
+        geo.setDrawRange(0, pointCount);
       } else {
         for (let i = 0; i < arr.length; i++) {
           pos.array[i] = arr[i];
         }
+        pos.needsUpdate = true;
       }
-      pos.needsUpdate = true;
       geo.computeBoundingSphere();
     }
   }, [odom]);

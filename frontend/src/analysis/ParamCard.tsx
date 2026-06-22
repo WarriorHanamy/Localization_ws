@@ -50,6 +50,7 @@ export function ParamCard({ param }: { param: ParamDef }) {
       </p>
 
       {/* Math */}
+      {param.math && (
       <div
         style={{
           padding: "8px 12px",
@@ -68,6 +69,7 @@ export function ParamCard({ param }: { param: ParamDef }) {
         </span>
         {param.math}
       </div>
+      )}
 
       {/* Source code references */}
       <SourceRef refs={param.refs} />

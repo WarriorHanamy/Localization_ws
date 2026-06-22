@@ -5,14 +5,16 @@ import { StatusBar } from "./components/StatusBar";
 import { NavBar } from "./components/NavBar";
 import { AnalysisPage } from "./analysis";
 import { ReplayPage } from "./analysis/pages/ReplayPage";
+import { ComparePage } from "./compare";
 
-type View = "dashboard" | "analysis" | "replay";
+type View = "dashboard" | "analysis" | "replay" | "compare";
 
 function useView(): View {
   const [view, setView] = useState<View>(() => {
     const h = window.location.hash.replace("#", "");
     if (h === "analysis") return "analysis";
     if (h === "replay") return "replay";
+    if (h === "compare") return "compare";
     return "dashboard";
   });
   useEffect(() => {
@@ -20,6 +22,7 @@ function useView(): View {
       const h = window.location.hash.replace("#", "");
       if (h === "analysis") setView("analysis");
       else if (h === "replay") setView("replay");
+      else if (h === "compare") setView("compare");
       else setView("dashboard");
     };
     window.addEventListener("hashchange", onHash);
@@ -52,6 +55,12 @@ export default function App(): React.JSX.Element {
       {view === "analysis" && (
         <div style={{ flex: 1, overflow: "hidden" }}>
           <AnalysisPage />
+        </div>
+      )}
+
+      {view === "compare" && (
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <ComparePage />
         </div>
       )}
     </div>
