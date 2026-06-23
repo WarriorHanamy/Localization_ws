@@ -1,6 +1,6 @@
 import { $ } from "bun";
 import { runSSH, runSSHDetached, isUSBReachable } from "../core/ssh";
-import { REMOTE_PATH, ROS_DISTRO } from "../core/config";
+import { REC_DEVICE_LOC_WS, ROS_DISTRO } from "../core/config";
 
 const LAUNCH_NAMES = {
   slam: "fast_lio bringup_mid360s.launch",
@@ -18,7 +18,7 @@ export interface DashboardArgs {
 export function envSetup(): string {
   return [
     `source /opt/ros/${ROS_DISTRO}/setup.bash`,
-    `source ${REMOTE_PATH}/devel/setup.bash`,
+    `source ${REC_DEVICE_LOC_WS}/devel/setup.bash`,
   ].join(" && ");
 }
 
@@ -76,7 +76,7 @@ export async function startMqttBridge(): Promise<void> {
   console.log("[dashboard] Starting MQTT bridge on Jetson ...");
   const bridgeCmd = [
     envSetup(),
-    `python3 ${REMOTE_PATH}/src/mqtt_bridge.py > /dev/null 2>&1 &`,
+    `python3 ${REC_DEVICE_LOC_WS}/src/mqtt_bridge.py > /dev/null 2>&1 &`,
   ].join(" && ");
   await runSSHDetached(bridgeCmd);
   await Bun.sleep(2000);

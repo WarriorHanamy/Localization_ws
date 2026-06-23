@@ -2,7 +2,7 @@ export const ROS_DISTRO = "noetic";
 
 export const REMOTE_HOST_USB = "192.168.55.1";
 export const REMOTE_USER = "nv";
-export const REMOTE_PATH = "/home/nv/Localization_ws";
+export const REC_DEVICE_LOC_WS = "/home/nv/Localization_ws";
 
 export const SSH_OPTS =
   "-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o LogLevel=ERROR";

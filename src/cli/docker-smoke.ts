@@ -1,19 +1,19 @@
 /**
  * FAST-LIO Docker Smoke Test
  *
- * Runs a codified checklist against a running fastlio container.
+ * Starts a named container (suffixed with -smoke) and runs a codified checklist.
  * All ROS commands are forwarded through `docker exec` on the remote Jetson.
  *
  * Usage:
  *   bun run docker-smoke <recipe>
  *
  * Example:
- *   bun run docker-start --recipe mapping-mid360
- *   bun run docker-smoke mapping-mid360
+ *   bun run docker-smoke mapping-mid360s
  */
-import { runSSH, isUSBReachable } from "../core/ssh";
+import { runSSH, isUSBReachable, checkSSH } from "../core/ssh";
+import { startContainer } from "./docker-start";
 import type { RecipeName } from "../core/config";
-import { RECIPES, REMOTE_PATH, ROS_DISTRO } from "../core/config";
+import { RECIPES } from "../core/config";
 
 // ═══════════════════════════════════════════════════════════════
 // Smoke Test Checklist (codified)
@@ -100,55 +100,71 @@ Recipes:
 ${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\n")}
 `;
 
-async function ensureNativeDriver(): Promise<{ healthy: boolean; detail: string }> {
-  console.log("\n\x1b[1;33m[pre-flight] Ensuring native LiDAR driver is healthy...\x1b[0m");
+/**
+ * Inspect and clean device host processes so the container can take over
+ * port 11311 (roscore) and the LiDAR UDP port.
+ */
+async function cleanDeviceEnv(containerName: string): Promise<void> {
+  console.log("\n\x1b[1;33m[pre-flight] Inspecting device environment...\x1b[0m");
 
-  const ddir = "$HOME/Localization_ws";
-  const ros = `source /opt/ros/${ROS_DISTRO}/setup.bash`;
-  const rosDev = `${ros} && source ${REMOTE_PATH}/devel/setup.bash 2>/dev/null`;
-
-  // Step 1 — kill zombie livox processes
-  await runSSH("sudo -n pkill -9 -f livox_ros_driver2 2>/dev/null || true; sleep 2; echo KILL_DONE", false);
-
-  // Step 2 — ensure roscore is running
-  { const { stdout } = await runSSH(`${ros} && timeout 3 rostopic list 2>&1 | grep -q /rosout && echo ROS_OK || echo ROS_NO`, false);
-    if (!stdout.includes("ROS_OK")) {
-      await runSSH(`${ros} && roscore > /tmp/roscore.log 2>&1 &`, false);
-      await new Promise(r => setTimeout(r, 3000));
-    } }
-
-  // Step 3 — read lidar IP from config
-  const { stdout: lidarIpRaw } = await runSSH(`jq -r '.lidar_configs[0].ip // empty' ${REMOTE_PATH}/bringup/config/MID360s_config.json 2>/dev/null || echo 192.168.2.88`, false);
-  const lidarIp = lidarIpRaw.trim() || "192.168.2.88";
-
-  // Step 4 — check if driver is already publishing IMU
+  // 1. Device host roscore
   {
-    const { stdout } = await runSSH(`${ros} && timeout 4 rostopic hz /livox/imu --window=20 2>&1 | grep "average rate" | tail -1 || echo NO_IMU`, false);
-    const m = stdout.match(/average rate:\s*([\d.]+)/);
-    if (m) {
-      console.log(`  \x1b[32mOK\x1b[0m native driver alive (IMU ${parseFloat(m[1]).toFixed(0)} Hz, lidar=${lidarIp})`);
-      return { healthy: true, detail: "native driver OK" };
+    const { stdout } = await runSSH(
+      "pgrep -a rosmaster 2>/dev/null || echo NONE",
+      false,
+    );
+    if (stdout.includes("NONE")) {
+      console.log("  Device host roscore: \x1b[2mnot running\x1b[0m");
+    } else {
+      const lines = stdout.trim().split("\n");
+      for (const line of lines) {
+        const pid = line.trim().split(/\s+/)[0];
+        console.log(`  Device host roscore: \x1b[33mPID ${pid}\x1b[0m — killing to free port 11311`);
+        await runSSH(`sudo kill -9 ${pid} 2>/dev/null || true; sleep 1; echo OK`, false);
+      }
+      console.log("    \x1b[32mstopped\x1b[0m");
     }
   }
 
-  // Step 5 — start driver
-  console.log(`  Starting native driver for lidar ${lidarIp}...`);
-  await runSSH(`${ros} && rosparam delete /user_config_path 2>/dev/null; rosparam set /user_config_path ${REMOTE_PATH}/bringup/config/MID360s_config.json; rosparam set /xfer_format 0; rosparam set /multi_topic 0; rosparam set /data_src 0; rosparam set /cmdline_str ${lidarIp}; rosparam set /frame_id livox_frame`, false);
-  await runSSH(`${rosDev} && nohup rosrun livox_ros_driver2 livox_ros_driver2_node ${lidarIp} __name:=livox_lidar_publisher2 > /tmp/livox_driver.log 2>&1 &`, false);
-  await new Promise(r => setTimeout(r, 9000));
-
-  // Step 6 — verify
+  // 2. Device host Livox driver
   {
-    const { stdout } = await runSSH(`${ros} && timeout 4 rostopic hz /livox/imu --window=20 2>&1 | grep "average rate" | tail -1 || echo NO_IMU`, false);
-    const m = stdout.match(/average rate:\s*([\d.]+)/);
-    if (m) {
-      console.log(`  \x1b[32mOK\x1b[0m driver started (IMU ${parseFloat(m[1]).toFixed(0)} Hz)`);
-      return { healthy: true, detail: "driver started" };
+    const { stdout } = await runSSH(
+      "pgrep -af livox_ros_driver2 2>/dev/null || echo NONE",
+      false,
+    );
+    if (stdout.includes("NONE")) {
+      console.log("  Device host Livox driver: \x1b[2mnot running\x1b[0m");
+    } else {
+      const lines = stdout.trim().split("\n");
+      console.log(`  Device host Livox driver: \x1b[33m${lines.length} process(es)\x1b[0m`);
+      for (const line of lines) {
+        console.log(`    ${line}`);
+      }
+      await runSSH("sudo -n pkill -9 -f livox_ros_driver2 2>/dev/null; sleep 2; echo OK", false);
+      const { stdout: again } = await runSSH(
+        "pgrep -af livox_ros_driver2 2>/dev/null || echo NONE",
+        false,
+      );
+      if (again.includes("NONE")) {
+        console.log("    \x1b[32mstopped\x1b[0m");
+      } else {
+        console.log("    \x1b[31mWARN\x1b[0m driver still running");
+      }
     }
   }
 
-  console.log("  \x1b[31mFAIL\x1b[0m driver did not start — check /tmp/livox_driver.log on Jetson");
-  return { healthy: false, detail: "driver failed" };
+  // 3. Device container
+  {
+    const { stdout } = await runSSH(
+      `docker ps -a --filter name=${containerName} --format '{{.Status}}' 2>/dev/null | head -1 || echo NOT_FOUND`,
+      false,
+    );
+    if (stdout.includes("NOT_FOUND")) {
+      console.log(`  Device container (${containerName}): \x1b[2mnot found\x1b[0m`);
+    } else {
+      console.log(`  Device container (${containerName}): \x1b[33m${stdout.trim()}\x1b[0m`);
+    }
+  }
 }
 
 export async function cmdDockerSmoke(args: string[]): Promise<void> {
@@ -160,7 +176,7 @@ export async function cmdDockerSmoke(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const containerName = `fastlio-${recipeName}`;
+  const containerName = `fastlio-${recipeName}-smoke`;
   const isMapping = recipeName.startsWith("mapping-");
 
   // Filter checklist: skip SLAM items for non-mapping recipes
@@ -171,7 +187,18 @@ export async function cmdDockerSmoke(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  await ensureNativeDriver();
+  const sshOk = await checkSSH();
+  if (!sshOk) {
+    console.log("[docker-smoke] SSH check failed. Run 'bun run sync' first.");
+    process.exit(1);
+  }
+
+  await cleanDeviceEnv(containerName);
+
+  await startContainer(recipeName as RecipeName, "smoke");
+
+  // Wait for container roscore to bind port 11311
+  await new Promise(r => setTimeout(r, 3000));
 
   console.log(`\n[docker-smoke] Testing container: ${containerName}\n`);
 
@@ -188,7 +215,7 @@ export async function cmdDockerSmoke(args: string[]): Promise<void> {
     // Container alive check: use docker ps instead of rosnode
     let result: { value: number; detail: string };
     if (item.target === "fastlio-") {
-      const remote = `docker ps --filter name=${containerName} --format '{{.Status}}' 2>/dev/null | head -1 || echo NOT_FOUND`;
+      const remote = `docker ps -a --filter name=${containerName} --format '{{.Status}}' 2>/dev/null | head -1 || echo NOT_FOUND`;
       const { stdout } = await runSSH(remote, false);
       const running = stdout.includes("Up") || stdout.includes("healthy");
       result = { value: running ? 1 : 0, detail: running ? stdout.trim() : "container not running" };
@@ -236,7 +263,7 @@ export async function cmdDockerSmoke(args: string[]): Promise<void> {
       }
     }
     console.log("\n  Possible causes:");
-    console.log("    • Container not running  →  run 'bun run docker-start --recipe <name>' first");
+    console.log("    • Container start failed  →  check docker logs on Jetson");
     console.log("    • IMU/LiDAR hz=0         →  check LiDAR USB/network, user_config_path, broadcast code");
     console.log("    • SLAM hz=0              →  check /home/nv/.ros/log for laserMapping startup errors");
     console.log("    • timeout on rostopic    →  container / ROS core not ready yet, retry in 5s");

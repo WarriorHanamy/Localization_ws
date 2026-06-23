@@ -9,7 +9,7 @@ import { cmdDockerBuild } from "./docker-build";
 import { cmdDockerStart } from "./docker-start";
 import { cmdDockerShell } from "./docker-shell";
 import { cmdDockerSmoke } from "./docker-smoke";
-import { WORKSPACE_PKGS, REMOTE_PATH, RECIPES } from "../core/config";
+import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
 const USAGE = `
@@ -55,7 +55,7 @@ async function cmdPaths(): Promise<void> {
     const pkgDir = `${repoRoot}/${pkg}`;
     console.log(`  ${pkg.padEnd(30)} ${pkgDir}`);
   }
-  console.log(`\n[l10n] Remote target: ${REMOTE_PATH}`);
+  console.log(`\n[l10n] Remote target: ${REC_DEVICE_LOC_WS}`);
 }
 
 const CMD = process.argv[2];

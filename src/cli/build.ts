@@ -1,12 +1,12 @@
 import { $ } from "bun";
 import { runSSH } from "../core/ssh";
-import { ROS_DISTRO, REMOTE_PATH } from "../core/config";
+import { ROS_DISTRO, REC_DEVICE_LOC_WS } from "../core/config";
 
 export async function cmdBuild(): Promise<void> {
-  console.log(`[l10n] Clean build on ${REMOTE_PATH} ...`);
+  console.log(`[l10n] Clean build on ${REC_DEVICE_LOC_WS} ...`);
   const buildCmd = [
     `source /opt/ros/${ROS_DISTRO}/setup.bash &&`,
-    `cd ${$.escape(REMOTE_PATH)} &&`,
+    `cd ${$.escape(REC_DEVICE_LOC_WS)} &&`,
     `catkin config --init --source-space . &&`,
     `rm -rf build devel &&`,
     `catkin build --no-status`,
@@ -19,7 +19,7 @@ export async function cmdIncrement(): Promise<void> {
   const repoRoot = (await import("../core/workspace")).getRepoRoot();
   const { runRSync, sshTarget } = await import("../core/ssh");
   const src = `${repoRoot}/`;
-  const dst = `${sshTarget()}:${REMOTE_PATH}/`;
+  const dst = `${sshTarget()}:${REC_DEVICE_LOC_WS}/`;
 
   console.log(`[l10n] Stage 1/2: Rsync ${repoRoot} -> ${dst}`);
   await runRSync(src, dst);
@@ -27,7 +27,7 @@ export async function cmdIncrement(): Promise<void> {
   console.log("[l10n] Stage 2/2: catkin build (incremental) ...");
   const buildCmd = [
     `source /opt/ros/${ROS_DISTRO}/setup.bash &&`,
-    `cd ${$.escape(REMOTE_PATH)} &&`,
+    `cd ${$.escape(REC_DEVICE_LOC_WS)} &&`,
     `catkin config --init --source-space . &&`,
     `catkin build --no-status`,
   ].join(" ");
@@ -39,7 +39,7 @@ export async function cmdFull(): Promise<void> {
   const repoRoot = (await import("../core/workspace")).getRepoRoot();
   const { runRSync, sshTarget } = await import("../core/ssh");
   const src = `${repoRoot}/`;
-  const dst = `${sshTarget()}:${REMOTE_PATH}/`;
+  const dst = `${sshTarget()}:${REC_DEVICE_LOC_WS}/`;
 
   console.log(`[l10n] Stage 1/2: Full rsync ${repoRoot} -> ${dst}`);
   await runRSync(src, dst);
@@ -47,7 +47,7 @@ export async function cmdFull(): Promise<void> {
   console.log("[l10n] Stage 2/2: catkin build (clean rebuild) ...");
   const buildCmd = [
     `source /opt/ros/${ROS_DISTRO}/setup.bash &&`,
-    `cd ${$.escape(REMOTE_PATH)} &&`,
+    `cd ${$.escape(REC_DEVICE_LOC_WS)} &&`,
     `catkin config --init --source-space . &&`,
     `rm -rf build devel &&`,
     `catkin build --no-status`,
@@ -73,7 +73,7 @@ export async function cmdBuildPkg(pkg: string): Promise<void> {
 
   const buildCmd = [
     `source /opt/ros/${ROS_DISTRO}/setup.bash &&`,
-    `cd ${$.escape(REMOTE_PATH)} &&`,
+    `cd ${$.escape(REC_DEVICE_LOC_WS)} &&`,
     `catkin build ${$.escape(pkg)} --no-status`,
   ].join(" ");
   await runSSH(buildCmd);

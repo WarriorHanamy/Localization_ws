@@ -4,7 +4,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { spawn } from "bun";
 import { runSSH, runSSHDetached } from "../core/ssh";
-import { ROS_DISTRO, REMOTE_PATH, RUSTDESK_ID } from "../core/config";
+import { ROS_DISTRO, REC_DEVICE_LOC_WS, RUSTDESK_ID } from "../core/config";
 
 function rustdeskPassword(): string {
   const env = process.env.RUSTDESK_PASS;
@@ -45,8 +45,8 @@ function launchVNC(): void {
 }
 
 const PRESETS: Record<string, string> = {
-  "fast-lio": `${REMOTE_PATH}/FAST_LIO/rviz_cfg/loam_livox.rviz`,
-  livox: `${REMOTE_PATH}/livox_ros_driver2/config/display_point_cloud_ROS1.rviz`,
+  "fast-lio": `${REC_DEVICE_LOC_WS}/FAST_LIO/rviz_cfg/loam_livox.rviz`,
+  livox: `${REC_DEVICE_LOC_WS}/livox_ros_driver2/config/display_point_cloud_ROS1.rviz`,
 };
 
 export interface RvizArgs {
@@ -56,13 +56,13 @@ export interface RvizArgs {
 
 export async function cmdRviz(args: RvizArgs): Promise<void> {
   const key = args.config || "fast-lio";
-  const rvizCfg = PRESETS[key] || `${REMOTE_PATH}/${key}`;
+  const rvizCfg = PRESETS[key] || `${REC_DEVICE_LOC_WS}/${key}`;
 
   console.log(`[l10n] Launching RViz (${key}) on Jetson display :0 ...`);
   const rvizCmd = [
     `export DISPLAY=:0 &&`,
     `source /opt/ros/${ROS_DISTRO}/setup.bash &&`,
-    `source ${$.escape(REMOTE_PATH)}/devel/setup.bash &&`,
+    `source ${$.escape(REC_DEVICE_LOC_WS)}/devel/setup.bash &&`,
     `rviz -d ${$.escape(rvizCfg)}`,
   ].join(" ");
   const rc = await runSSHDetached(rvizCmd);
