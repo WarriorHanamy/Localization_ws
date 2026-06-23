@@ -104,6 +104,7 @@ double debug_circular_cloud_radius = 1.0;
 // wxx
 bool map_incremental_ = true;
 bool initial_map_from_pcd_ = false;
+double fov_yaw_offset_deg = 0.0;
 string initial_map_pcd_name_ = "initial_map.pcd";
 bool save_new_map_to_pcd_ = false;
 string new_map_pcd_name_ = "new_map.pcd";
@@ -773,12 +774,16 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFull,
     {
         int size = feats_undistort->points.size();
         PointCloudXYZI::Ptr laserCloudWorld( \
-                        new PointCloudXYZI(size, 1));
+                        new PointCloudXYZI());
 
         for (int i = 0; i < size; i++)
         {
-            RGBpointBodyToWorld(&feats_undistort->points[i], \
-                                &laserCloudWorld->points[i]);
+            double yaw = atan2(feats_undistort->points[i].y,
+                            feats_undistort->points[i].x) * 180.0 / M_PI;
+            if (fabs(yaw) > 60.0) continue;
+            PointType pt;
+            RGBpointBodyToWorld(&feats_undistort->points[i], &pt);
+            laserCloudWorld->push_back(pt);
         }
         *pcl_wait_save += *laserCloudWorld;
 
@@ -795,6 +800,32 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFull,
             scan_wait_num = 0;
         }
     }
+}
+
+void publish_frame_world_fov(const ros::Publisher & pubLaserCloudFov, double fov_deg)
+{
+    PointCloudXYZI::Ptr laserCloudFullRes(dense_pub_en ? feats_undistort : feats_down_body);
+    int size = laserCloudFullRes->points.size();
+    PointCloudXYZI::Ptr laserCloudWorld(new PointCloudXYZI());
+
+    for (int i = 0; i < size; i++)
+    {
+        double yaw = atan2(laserCloudFullRes->points[i].y,
+                           laserCloudFullRes->points[i].x) * 180.0 / M_PI;
+        yaw -= fov_yaw_offset_deg;
+
+        if (fabs(yaw) > fov_deg / 2.0) continue;
+
+        PointType pt;
+        RGBpointBodyToWorld(&laserCloudFullRes->points[i], &pt);
+        laserCloudWorld->push_back(pt);
+    }
+
+    sensor_msgs::PointCloud2 laserCloudmsg;
+    pcl::toROSMsg(*laserCloudWorld, laserCloudmsg);
+    laserCloudmsg.header.stamp = ros::Time().fromSec(lidar_end_time);
+    laserCloudmsg.header.frame_id = "world";
+    pubLaserCloudFov.publish(laserCloudmsg);
 }
 
 void publish_frame_body(const ros::Publisher & pubLaserCloudFull_body)
@@ -1094,6 +1125,7 @@ int main(int argc, char** argv)
     nh.param<bool>("publish/debug_circular_scan_publish_en",debug_circular_scan_pub_en, true);
     nh.param<bool>("publish/no_point_filter_scan_publish_en",no_point_filter_scan_pub_en, true);
     nh.param<double>("publish/debug_circular_cloud_radius",debug_circular_cloud_radius, 1.0);
+    nh.param<double>("publish/fov_yaw_offset_deg", fov_yaw_offset_deg, 0.0);
     nh.param<bool>("publish/dense_publish_en",dense_pub_en, true);
     nh.param<bool>("publish/scan_bodyframe_pub_en",scan_body_pub_en, true);
     nh.param<int>("max_iteration",NUM_MAX_ITERATIONS,4);
@@ -1336,6 +1368,10 @@ int main(int argc, char** argv)
             ("/circular_cloud_registered", 100000);
     ros::Publisher pubLaserCloudFull_body = nh.advertise<sensor_msgs::PointCloud2>
             ("/cloud_registered_body", 100000);
+    ros::Publisher pubLaserCloudFov120 = nh.advertise<sensor_msgs::PointCloud2>
+            ("/cloud_registered_fov120", 100000);
+    ros::Publisher pubLaserCloudFov90 = nh.advertise<sensor_msgs::PointCloud2>
+            ("/cloud_registered_fov90", 100000);
     // wxx 先验局部点云 / 合并点云
     ros::Publisher pubLaserCloudWithPrior = nh.advertise<sensor_msgs::PointCloud2>
             ("/cloud_registered_with_prior", 100000);
@@ -1488,6 +1524,8 @@ int main(int argc, char** argv)
 
             // t2 = omp_get_wtime();
             t2 = ros::Time::now().toSec();
+            publish_frame_world_fov(pubLaserCloudFov120, 120.0);
+            publish_frame_world_fov(pubLaserCloudFov90, 90.0);
             
             /*** iterated state estimation ***/
             double t_update_start = omp_get_wtime();

@@ -33,6 +33,7 @@ export async function runSSH(
     exitCode: proc.exitCode,
   };
   if (check && result.exitCode !== 0) {
+    if (result.stderr) process.stderr.write(result.stderr);
     process.exit(result.exitCode);
   }
   return result;

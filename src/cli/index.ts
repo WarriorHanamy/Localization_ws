@@ -1,5 +1,4 @@
 import { cmdSync } from "./sync";
-import { cmdBuild, cmdIncrement, cmdFull, cmdBuildPkg } from "./build";
 import { cmdCheck } from "./check";
 import { cmdRviz, type RvizArgs } from "./rviz";
 import { cmdSource } from "./devel";
@@ -18,19 +17,16 @@ Usage: bun run <command> [args]
 
 Commands:
   sync              rsync workspace to Jetson
-  build             remote catkin build (clean rebuild)
-  increment         rsync + remote catkin build (no clean)
-  full              rsync + remote clean catkin build
   check             verify SSH connectivity and remote tools
   paths             print workspace package paths
   rviz [preset]     launch RViz on Jetson display
-  build-pkg <name>  build a single package
   source            print ROS source commands for eval
   dashboard         start web dashboard (auto-launch SLAM + serve frontend)
   dashboard --dev   start in dev mode (Vite HMR proxy)
   dashboard --no-launch  skip auto-launching SLAM pipeline
   smoke             run FAST-LIO smoke test checklist
   smoke --level slam  only check SLAM layer
+  smoke fov         FOV crop smoke test (sync+build+launch+RVIZ)
 
 Docker commands:
   docker-dbuild      build fastlio-jetson image on Jetson (SSH)
@@ -73,15 +69,6 @@ async function main() {
     case "sync":
       await cmdSync();
       break;
-    case "build":
-      await cmdBuild();
-      break;
-    case "increment":
-      await cmdIncrement();
-      break;
-    case "full":
-      await cmdFull();
-      break;
     case "check":
       await cmdCheck();
       break;
@@ -102,13 +89,6 @@ async function main() {
       });
       break;
     }
-    case "build-pkg":
-      if (!args[0]) {
-        console.log("[l10n] Usage: bun run build-pkg <package-name>");
-        process.exit(1);
-      }
-      await cmdBuildPkg(args[0]);
-      break;
     case "source":
       await cmdSource();
       break;

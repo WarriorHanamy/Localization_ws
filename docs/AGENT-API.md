@@ -52,7 +52,7 @@ prod start  # no recipe → opens fzf menu
 | **Clean build**        | `bun run build`          | Remote catkin clean build                        |
 | **Incremental build**  | `bun run increment`      | rsync + remote incremental catkin build          |
 | **Full rebuild**       | `bun run full`           | rsync + remote clean catkin rebuild              |
-| **Single package**     | `bun run build-pkg <pkg>`| Build one ROS package remotely                   |
+| **Docker image build**  | `bun run docker-dbuild`  | Build fastlio-jetson image with layered catkin_make |
 | **Docker image build** | `bun run docker-dbuild`  | Build `fastlio-jetson:latest` on device           |
 
 ---

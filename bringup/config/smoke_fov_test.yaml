@@ -1,0 +1,54 @@
+common:
+  imu_topic: /livox/imu
+  lid_topic: /livox/lidar
+  time_offset_lidar_to_imu: 0.0
+  time_sync_en: false
+mapping:
+  acc_cov: 0.1
+  b_acc_cov: 0.0001
+  b_gyr_cov: 0.0001
+  det_range: 100.0
+  extrinsic_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+  extrinsic_T: [0.00, 0, 0.00]
+  extrinsic_est_en: false
+  fov_degree: 360
+  gyr_cov: 0.1
+pcd_save:
+  interval: 1
+  pcd_save_en: true
+preprocess:
+  blind: 0.5
+  lidar_type: 1
+  scan_line: 4
+publish:
+  dense_publish_en: true
+  path_en: false
+  scan_bodyframe_pub_en: false
+  scan_publish_en: true
+  debug_circular_scan_publish_en: false
+  debug_circular_cloud_radius: 2.0
+  no_point_filter_scan_publish_en: true
+  fov_yaw_offset_deg: 0.0
+wxx:
+  Lidar_wrt_Body_R: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+  Lidar_wrt_Body_T: [0, 0, 0]
+  initial_map_from_pcd: false
+  map_incremental: false
+  initial_map_pcd_name: initial_map.pcd
+  save_new_map_to_pcd: true
+  new_map_pcd_name: smoke_test_map.pcd
+  sched_setaffinity_en: false
+  cpu_core_num: 8
+  sched_setaffinity_cores: [0, 1, 2]
+  anomaly_detection:
+    timeout_imu: 0.1
+    timeout_lidar: 0.2
+    imu_freq: 200
+    lidar_freq: 10
+    hardware_recover_duration: 0.1
+prior_local_enable: false
+prior_local_radius: 5.0
+prior_local_motion_check: false
+prior_local_motion_thresh: 0.5
+prior_local_leaf: 0.1
+prior_local_gen_hz: 2.0

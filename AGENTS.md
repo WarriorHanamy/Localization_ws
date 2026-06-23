@@ -57,3 +57,62 @@ bun run prod status                 # works identically
 - **SSH auto-bridge**: `prod.ts` detects `docker` availability; if absent
   (devel host), it wraps the command in `ssh nv@192.168.55.1` automatically.
 - **Agent commands**: See `docs/AGENT-API.md` for the complete command reference.
+
+### Container runtime rule
+
+All ROS node execution must happen inside Docker containers on the Jetson.
+Never run `roslaunch`, `rosrun`, or `catkin build` directly on the Jetson host.
+The device host is solely a scheduling layer — it runs `bun`, `tmux`, `docker`,
+and `ssh` commands.
+
+RVIZ is an exception — it runs natively on the Jetson's display `:0` for GPU
+access, viewed remotely via VNC or RustDesk.
+
+### CI certification (agent responsibility)
+
+After any code or config change that affects SLAM behavior, the agent MUST
+verify the change before declaring the task complete. This is the agent's
+responsibility, never the user's.
+
+**C++ changes** (FAST_LIO/, livox_ros_driver2/, ekf_quat_pose/, incremental_map_publisher/):
+
+```bash
+bun run sync && bun run docker-dbuild
+```
+
+Dockerfile layered builds keep the rebuild fast — only the changed package layer recompiles.
+
+**bringup/ changes** (launch/*.launch, config/*.yaml, rviz_cfg/*.rviz):
+
+```bash
+bun run sync
+```
+
+No image rebuild needed — bringup is bind-mounted at container runtime.
+
+**Combined changes** (C++ + bringup):
+
+```bash
+bun run sync && bun run docker-dbuild
+```
+
+**Every change** must pass:
+1. Sync reaches the Jetson without error
+2. Build (if applicable) completes without error
+3. Result is reported to the user (pass / fail + log path if failed)
+
+The agent MUST NOT ask the user to run sync, build, or docker-dbuild manually.
+
+### Smoke tests (human visual inspection)
+
+Tests that require human visual verification MUST provide a single command:
+`bun run smoke <test-name>`. The command is a pure runtime launcher — it
+MUST NOT include sync or build (those are the agent's CI responsibility).
+
+The smoke command handles: launch pipeline on the Jetson, open RViz or other
+visualization, and auto-attach to display results directly to the user.
+
+Smoke test files follow a `smoke_` prefix convention:
+- Config:   `bringup/config/smoke_<test>.yaml`
+- Launch:   `bringup/launch/smoke_<test>.launch`
+- RVIZ:     `bringup/rviz_cfg/smoke_<test>.rviz`

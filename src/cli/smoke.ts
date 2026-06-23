@@ -10,7 +10,8 @@
  *   bun run smoke --level slam # only SLAM layer
  */
 import { runSSH, runSSHDetached, sshTarget, isUSBReachable } from "../core/ssh";
-import { REC_DEVICE_LOC_WS, ROS_DISTRO } from "../core/config";
+import { REC_DEVICE_LOC_WS, ROS_DISTRO, REMOTE_USER, REMOTE_HOST_USB, SSH_OPTS, type RecipeName } from "../core/config";
+import { startContainer } from "./docker-start";
 
 // ═══════════════════════════════════════════════════════════════
 // Smoke Test Checklist (codified)
@@ -200,7 +201,69 @@ async function ensureNativeDriver(): Promise<void> {
   console.log("  \x1b[31mFAIL\x1b[0m driver did not start — run manually: rosrun livox_ros_driver2 livox_ros_driver2_node " + lidarIp);
 }
 
+function onDeviceHost(): boolean {
+  if (process.env.LOCALIZATION_DEVICE_HOST === "1") return true;
+  return process.cwd().startsWith(REC_DEVICE_LOC_WS);
+}
+
+async function doSmokeFov(): Promise<void> {
+  const SESSION = "smoke-fov";
+  const recipeName = "smoke-fov" as RecipeName;
+  const containerName = `fastlio-${recipeName}`;
+  const rvizCfg = `${REC_DEVICE_LOC_WS}/src/bringup/rviz_cfg/smoke_fov_test.rviz`;
+
+  // Devel-host: SSH bridge with TTY
+  if (!onDeviceHost()) {
+    const target = `${REMOTE_USER}@${REMOTE_HOST_USB}`;
+    const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
+    opts.unshift("-t");
+    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke fov`;
+    const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
+      stdio: ["inherit", "inherit", "inherit"],
+    });
+    process.exit(proc.exitCode);
+  }
+
+  // ---- Below runs on device-host ----
+  // Kill stale tmux session
+  Bun.spawnSync(["tmux", "kill-session", "-t", SESSION], { stderr: "ignore" });
+
+  // Start container (docker-start handles stale container cleanup)
+  console.log(`[smoke] Starting container '${containerName}' ...`);
+  await startContainer(recipeName);
+
+  // Create tmux session with slam window (tails container log)
+  console.log(`[smoke] Creating tmux session '${SESSION}' ...`);
+  Bun.spawnSync(["tmux", "new-session", "-d", "-s", SESSION, "-n", "slam"]);
+  Bun.spawnSync(["tmux", "send-keys", "-t", `${SESSION}:slam`,
+    `docker logs -f ${containerName} 2>&1`, "Enter"]);
+
+  // RVIZ window (runs natively on display :0, container has --network host)
+  Bun.spawnSync(["tmux", "new-window", "-t", SESSION, "-n", "rviz"]);
+  Bun.spawnSync(["tmux", "send-keys", "-t", `${SESSION}:rviz`,
+    `sleep 6 && export DISPLAY=:0 && source /opt/ros/${ROS_DISTRO}/setup.bash && rviz -d ${rvizCfg}`, "Enter"]);
+
+  Bun.spawnSync(["tmux", "select-window", "-t", `${SESSION}:slam`]);
+
+  console.log(`[smoke] FOV smoke test started. Session: ${SESSION}`);
+  console.log(`[smoke]   Container: ${containerName}`);
+  console.log(`[smoke]   Window 'slam': container log`);
+  console.log(`[smoke]   Window 'rviz': RViz on display :0 (view via VNC)`);
+
+  if (process.stdin.isTTY) {
+    console.log("[smoke] Attaching (detach: Ctrl-B, d) ...");
+    Bun.spawnSync(["tmux", "attach-session", "-t", SESSION], {
+      stdio: ["inherit", "inherit", "inherit"],
+    });
+    console.log("[smoke] Detached.");
+  }
+}
+
 export async function cmdSmoke(args: string[]): Promise<void> {
+  if (args[0] === "fov") {
+    await doSmokeFov();
+    return;
+  }
   const filterLevel = args.includes("--level") ? args[args.indexOf("--level") + 1] : null;
   const items = filterLevel
     ? CHECKLIST.filter((c) => c.level === filterLevel)

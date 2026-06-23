@@ -45,7 +45,7 @@ Available subcommands:
 | `build`              | Remote catkin build (`rm -rf build devel`)    |
 | `increment`          | rsync + remote catkin build (no clean)        |
 | `full`               | rsync + remote clean catkin build             |
-| `build-pkg <pkg>`    | Build single package on remote                |
+| `docker-dbuild`      | Build fastlio-jetson image layer via Docker    |
 | `paths`              | Print local/remote workspace paths            |
 | `rviz`               | Launch RViz on Jetson display (via RustDesk)  |
 | `rviz livox`         | Launch RViz with raw LiDAR point cloud        |
@@ -57,7 +57,7 @@ bun run check        # is Jetson reachable?
 bun run sync         # rsync source to Jetson
 bun run build        # clean build on Jetson
 bun run increment    # quick: rsync + incremental build
-bun run build-pkg FAST_LIO  # single-package rebuild
+bun run docker-dbuild       # layer rebuild via Docker
 ```
 
 ---
@@ -72,7 +72,7 @@ bun run build-pkg FAST_LIO  # single-package rebuild
 
 ```bash
 bun run sync
-bun run build-pkg <pkg>
+bun run docker-dbuild
 ```
 
 ### CD (Delivery / Prod)
@@ -157,7 +157,7 @@ Classify affected files as producer, consumer, launch/config, build system, or d
 
    ```bash
    bun run sync
-   bun run build-pkg <pkg>
+   bun run docker-dbuild
    ```
 
 7. Report build command, result, and remaining risks.

@@ -53,6 +53,7 @@ export const RECIPES = {
   "mapping-mid360s":       { launch: "bringup_mid360s.launch",       desc: "mid360s + mapping, no prior" },
   "mapping-mid360s-prior": { launch: "bringup_mid360s_prior.launch", desc: "mid360s + mapping, prior map" },
   "mapping-mid360s-reloc": { launch: "bringup_mid360s_reloc.launch", desc: "mid360s + mapping, prior + align" },
+  "smoke-fov":              { launch: "smoke_fov_test.launch",       desc: "FOV crop visual smoke test" },
 } as const;
 
 export type RecipeName = keyof typeof RECIPES;

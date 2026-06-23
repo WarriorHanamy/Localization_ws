@@ -31,13 +31,18 @@ RUN ldconfig
 
 # Catkin workspace
 RUN mkdir -p /catkin_ws/src
+
+# Layer 1 — stable packages (rarely changed)
 COPY livox_ros_driver2/ /catkin_ws/src/livox_ros_driver2/
-COPY FAST_LIO/          /catkin_ws/src/fast_lio/
 COPY ekf_quat_pose/     /catkin_ws/src/ekf_quat_pose/
 COPY incremental_map_publisher/ /catkin_ws/src/incremental_map_publisher/
-COPY bringup/           /catkin_ws/src/bringup/
+RUN . /opt/ros/noetic/setup.sh && \
+    cd /catkin_ws && \
+    catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release
 
-# Build all packages
+# Layer 2 — hot packages (frequently changed)
+COPY FAST_LIO/          /catkin_ws/src/fast_lio/
+COPY bringup/           /catkin_ws/src/bringup/
 RUN . /opt/ros/noetic/setup.sh && \
     cd /catkin_ws && \
     catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release

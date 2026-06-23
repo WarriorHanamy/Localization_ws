@@ -66,6 +66,7 @@ publish:
   debug_circular_scan_publish_en: false
   debug_circular_cloud_radius: 2.0
   no_point_filter_scan_publish_en: true
+  fov_yaw_offset_deg: 0.0
 wxx:
   # Lidar_Odom = Lidar_wrt_Body_R*(Body_Odom + Lidar_wrt_Body_T)
   Lidar_wrt_Body_R:
