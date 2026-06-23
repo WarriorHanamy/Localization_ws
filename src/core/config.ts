@@ -4,8 +4,9 @@ export const REMOTE_HOST_USB = "192.168.55.1";
 export const REMOTE_USER = "nv";
 export const REC_DEVICE_LOC_WS = "/home/nv/Localization_ws";
 
+const SSH_IDENTITY = `${process.env.HOME ?? "~"}/.ssh/id_ed25519`;
 export const SSH_OPTS =
-  "-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o LogLevel=ERROR";
+  `-F /dev/null -i ${SSH_IDENTITY} -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o LogLevel=ERROR`;
 
 export const WORKSPACE_PKGS = [
   "FAST_LIO",

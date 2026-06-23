@@ -386,6 +386,23 @@ Failed to init livox lidar sdk.
 **Always set `xfer_format=0` when the downstream SLAM is faster_lio
 (`lidar_type: 6`).**
 
+### 2.6 Repository-specific `bd_list` convention
+
+For this repository's current `livox_ros_driver2`, set `bd_list` defaults to
+`000000000000000` for both MID360 and Mid360s launchers. Keep overridable
+top-level declarations as `default=`, and pass them into an `<include>` with
+`value="$(arg bd_list)"`.
+
+Do not put the LiDAR IP in `bd_list`. Device selection and network endpoints
+come from `bringup/config/MID360_config.json` or `MID360s_config.json`. The
+current C++ startup path calls `InitLdsLidar(user_config_path)` and does not
+read the launch-only `cmdline_str` parameter, so deriving `bd_list` from
+`lidar_configs[0].ip` is misleading and must not be done in `docker-start`.
+
+Before applying this rule to a different driver revision, search its C++ for
+`cmdline_str` or argv whitelist parsing. Upstream variants may still use a
+broadcast-code whitelist.
+
 ---
 
 ## Layer 3 — SLAM Config: faster_lio

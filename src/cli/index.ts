@@ -35,7 +35,7 @@ Docker commands:
   docker-dbuild      build fastlio-jetson image on Jetson (SSH)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
-  docker-smoke       smoke-test a running container
+  docker-smoke       start and smoke-test a device container
 
 Recipes for docker-start:
 ${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\n")}

@@ -19,7 +19,6 @@ export async function startContainer(
     : `fastlio-${recipeName}`;
 
   const cmd = [
-    `LIDAR_IP=$(jq -r '.lidar_configs[0].ip // empty' ${REC_DEVICE_LOC_WS}/bringup/config/MID360s_config.json 2>/dev/null || echo 192.168.2.88)`,
     `docker stop ${containerName} 2>/dev/null || true`,
     `docker rm ${containerName} 2>/dev/null || true`,
     [
@@ -33,7 +32,7 @@ export async function startContainer(
       `-v ${$.escape(REC_DEVICE_LOC_WS)}/PCD:/catkin_ws/src/fast_lio/PCD`,
       `-v ${$.escape(REC_DEVICE_LOC_WS)}/bringup:/catkin_ws/src/bringup`,
       `fastlio-jetson:latest`,
-      `roslaunch bringup ${recipe.launch} bd_list:=$LIDAR_IP`,
+      `roslaunch bringup ${recipe.launch}`,
     ].join(" "),
   ].join("; ");
 

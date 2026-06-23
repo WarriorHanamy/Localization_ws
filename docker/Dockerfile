@@ -23,10 +23,10 @@ RUN apt-get update && apt-get install -y \
     ros-noetic-tf2-geometry-msgs \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-built Livox SDK2 (aarch64)
-COPY bringup/resource/livox_sdk2/*.a  /usr/local/lib/
-COPY bringup/resource/livox_sdk2/*.so /usr/local/lib/
-COPY bringup/resource/livox_sdk2/*.h  /usr/local/include/
+# Livox SDK2 staged from the device host by `bun run docker-dbuild`.
+# The build command rejects SDK archives without Mid360s support.
+COPY .docker-sdk/livox_sdk2/lib/     /usr/local/lib/
+COPY .docker-sdk/livox_sdk2/include/ /usr/local/include/
 RUN ldconfig
 
 # Catkin workspace
