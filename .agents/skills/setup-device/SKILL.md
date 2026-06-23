@@ -1,6 +1,6 @@
 ---
 name: setup-device
-description: Use when setting up core essential utilities on a {DEVICE} Jetson device: initial SSH via IP, mDNS/avahi-daemon, tmux, NTP time sync via wlan0, bash default shell, oh-my-bash, WiFi lock to Diff* SSID, Livox SDK2, SSH key deployment. Triggers when user mentions initializing a fresh Jetson, mDNS not resolving, installing tmux/NTP/oh-my-bash, locking WiFi, or configuring a new device.
+description: Use when setting up core essential utilities on a {DEVICE} Jetson device: initial SSH via IP, mDNS/avahi-daemon, tmux, NTP time sync via wlan0, bash default shell, oh-my-bash, WiFi lock to Diff* SSID, SSH key deployment. Triggers when user mentions initializing a fresh Jetson, mDNS not resolving, installing tmux/NTP/oh-my-bash, locking WiFi, or configuring a new device.
 ---
 
 # Setup Device
@@ -9,7 +9,7 @@ Configure a {DEVICE} Jetson device with core utilities: initial SSH access via I
 mDNS not available), mDNS/avahi-daemon so `nv-{DEVICE}.local` resolves, SSH key deployment for
 passwordless access, WiFi lock to Diff* SSID (all other WiFi disabled), NTP time sync via
 wlan0, tmux with mouse support, bash as default shell, oh-my-bash, default SSH working
-directory, and Livox SDK2 installation.
+directory.
 
 ## Prerequisites
 
@@ -385,57 +385,10 @@ See also `resource/config-ssh-default-folder.md` for the complementary **devel m
 config approach (using `RemoteCommand`).
 
 ```bash
-ssh nv@192.168.55.1 "bash -lc 'echo \"\" >> ~/.profile && echo \"# Auto-cd to workspace on SSH login\" >> ~/.profile && echo \"cd /home/nv/ros1-yopo\" >> ~/.profile'"
+ssh nv@192.168.55.1 "bash -lc 'echo \"\" >> ~/.profile && echo \"# Auto-cd to workspace on SSH login\" >> ~/.profile && echo \"cd /home/nv/Localization_ws\" >> ~/.profile'"
 ```
 
-### 7. Install Livox SDK2 (static library and headers)
-
-`livox_ros_driver2` requires the bundled Livox SDK. The device may have an older
-version installed — always run the install script to ensure version match (drivers
-may reference newer enum values like `kLivoxLidarTypeMid360s`).
-
-**Important**: `rsync` excludes `*.so` files, so the shared library must be copied
-separately if it wasn't bundled in the repo. The install script handles this.
-
-**7.1 Install from bundled pre-built SDK:**
-
-```bash
-ssh nv@192.168.55.1 "bash -lc 'cd /home/nv/ros1-yopo && bash .agents/skills/setup-device/livox_sdk_install.sh'"
-```
-
-The script copies headers and static library to `/usr/local/`. If the shared
-library (`liblivox_lidar_sdk_shared.so`) was excluded by rsync, copy it manually:
-
-```bash
-scp .agents/skills/setup-device/livox_sdk/liblivox_lidar_sdk_shared.so nv@192.168.55.1:/tmp/
-ssh nv@192.168.55.1 "sudo cp /tmp/liblivox_lidar_sdk_shared.so /usr/local/lib/ && sudo ldconfig"
-```
-
-**7.2 Verify correct version:**
-
-```bash
-ssh nv@192.168.55.1 "grep 'kLivoxLidarTypeMid360s' /usr/local/include/livox_lidar_def.h"
-```
-
-Expected output includes `kLivoxLidarTypeMid360s = 35`. If the enum is missing,
-the SDK was not updated — rerun the install and verify rsync did not exclude
-the header files.
-
-These files were pre-compiled on an identical {DEVICE} Jetson (aarch64, JetPack).
-If the architecture differs, build from source instead:
-
-```bash
-ssh nv@192.168.55.1 "bash -lc '
-cd /tmp &&
-git clone https://github.com/Livox-SDK/Livox-SDK2.git &&
-cd Livox-SDK2 &&
-mkdir -p build && cd build &&
-cmake .. && make -j\$(nproc) &&
-sudo make install
-'"
-```
-
-### 8. Sync code to device
+### 7. Sync code to device
 
 After all setup steps complete, deploy the workspace from devel machine to the device:
 
@@ -443,13 +396,13 @@ After all setup steps complete, deploy the workspace from devel machine to the d
 bun run sync
 ```
 
-This rsyncs the repository to `/home/nv/ros1-yopo` on the device. After sync,
+This rsyncs the repository to `/home/nv/Localization_ws` on the device. After sync,
 SSH login automatically enters the workspace (configured in Step 6).
 
 Verify the workspace is in place:
 
 ```bash
-ssh nv@192.168.55.1 "bash -lc 'ls -la ~/ros1-yopo/pyproject.toml'"
+ssh nv@192.168.55.1 "bash -lc 'ls -la ~/Localization_ws/pyproject.toml'"
 ```
 
 ## Verification
@@ -469,7 +422,7 @@ ssh nv@192.168.55.1 "bash -lc 'ls -la ~/ros1-yopo/pyproject.toml'"
 | WiFi locked | `ssh nv@192.168.55.1 "bash -lc 'nmcli -t -f TYPE connection show | grep 802-11 | wc -l'"` | `1` (only DiffRobot) |
 | WiFi lock dispatcher | `ssh nv@192.168.55.1 "bash -lc 'test -x /etc/NetworkManager/dispatcher.d/91-wifi-lock && echo YES'"` | `YES` |
 | LiDAR eth0 | `ssh nv@192.168.55.1 "bash -lc 'ip addr show eth0 | grep \\\"inet 192.168.2\\\"'"` | `192.168.2.50/24` |
-| SSH working dir | `ssh -t nv@192.168.55.1 'bash -l -c pwd'` | `/home/nv/ros1-yopo` |
+| SSH working dir | `ssh -t nv@192.168.55.1 'bash -l -c pwd'` | `/home/nv/Localization_ws` |
 
 ## Troubleshooting
 
@@ -488,7 +441,6 @@ ssh nv@192.168.55.1 "bash -lc 'ls -la ~/ros1-yopo/pyproject.toml'"
 | tmux config not applied | Existing session | New sessions pick up config; old ones need `tmux source ~/.tmux.conf` |
 | Device connects to random WiFi | Dispatcher not executing | Check `ls -la /etc/NetworkManager/dispatcher.d/91-wifi-lock`: must be executable; check `journalctl -u NetworkManager -g wifi-lock` |
 | WiFi keeps reconnecting | Powersave causing disconnects | Verify `nmcli -t -f 802-11-wireless.powersave connection show DiffRobot` shows `2` |
-| `find_library: liblivox_lidar_sdk_static.a` not found | Livox SDK not installed | Run `bash .agents/skills/setup-device/livox_sdk_install.sh` on device |
 | `bind failed` / `Create detection socket failed` | eth0 missing IP `192.168.2.50` (wired profile deleted) or previous livox process still holds UDP port | `sudo nmcli con up Livox-LiDAR` to restore IP; `pkill -f livox 2>/dev/null` to clear stale socket |
 | integration goes via WiFi instead of USB | USB cable disconnected or `192.168.55.1` unreachable | Connect USB-C cable; run `bun run check` to verify routing via USB |
 | `nv-{DEVICE}.local` resolves to wrong IP (e.g. `192.168.2.50` or `172.17.0.1`) instead of WiFi IP | Process contention on port 5353 (mDNS) -- typically `nxserver.bin` (NoMachine) advertising on all interfaces | See `resource/mDNS-debug.md` |

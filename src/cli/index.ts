@@ -9,6 +9,7 @@ import { cmdDockerBuild } from "./docker-build";
 import { cmdDockerStart } from "./docker-start";
 import { cmdDockerShell } from "./docker-shell";
 import { cmdDockerSmoke } from "./docker-smoke";
+import { cmdProd } from "./prod";
 import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
@@ -36,6 +37,12 @@ Docker commands:
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
   docker-smoke       start and smoke-test a device container
+
+Production (tmux + docker):
+  prod start --recipe <name>  start production pipeline
+  prod stop                   stop production session
+  prod attach                 attach to production tmux session
+  prod status                 show production status
 
 Recipes for docker-start:
 ${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\n")}
@@ -127,6 +134,9 @@ async function main() {
       break;
     case "docker-smoke":
       await cmdDockerSmoke(args);
+      break;
+    case "prod":
+      await cmdProd(args);
       break;
     case "help":
     case "--help":

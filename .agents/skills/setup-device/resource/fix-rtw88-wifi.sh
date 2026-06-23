@@ -14,7 +14,7 @@
 #
 # Usage from devel machine (repo already synced):
 #   ssh nv@192.168.55.1 \
-#     "bash -lc 'cd /home/nv/ros1-yopo && \
+#     "bash -lc 'cd /home/nv/Localization_ws && \
 #       bash .agents/skills/setup-device/resource/fix-rtw88-wifi.sh'"
 #
 # Without repo on device (pipe via SSH):

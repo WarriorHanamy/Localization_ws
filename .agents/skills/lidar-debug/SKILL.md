@@ -1,6 +1,6 @@
 ---
 name: lidar-debug
-description: Diagnose and fix LiDAR bringup failures for Livox MID360 or Mid360s — network reachability, driver JSON config, faster_lio message type alignment. Use when user reports LiDAR not working, params check failed, SLAM not receiving data, or network/ARP issues on the `{DEVICE}` Jetson.
+description: Diagnose and fix Livox MID360 or Mid360s bringup failures across network reachability, driver JSON, launch include chains, xfer_format, ROS message schemas, and FAST_LIO preprocessing. Use for LiDAR not working, params check failures, missing SLAM data, network/ARP faults, ROS datatype mismatches, or repeated PointCloud2 field errors such as "Failed to find match for field 'time'/'ring'" on the Jetson runtime.
 ---
 
 # LiDAR Debug
@@ -14,23 +14,24 @@ naming), and **SLAM config** (faster_lio message type alignment).
 
 ## Step 0: Identify Model
 
-Ask the user which Livox LiDAR model they are using. Set `model` for all
-subsequent steps.
+Identify the model from user intent and the detection log. Treat `dev_type:9`
+as MID360 and `dev_type:35` as Mid360s. Resolve any disagreement before
+editing configuration.
 
-| Model    | `model` variable | Vendor config template                       |
-| -------- | ---------------- | -------------------------------------------- |
-| MID360   | `mid360`          | `src/linker/livox_ros_driver2/config/MID360_config.json` |
-| Mid360s  | `mid360s`         | `src/linker/livox_ros_driver2/config/MID360s_config.json` |
+Inspect launch/config files only under `bringup/launch/` and
+`bringup/config/`; these bind-mounted files are canonical. Trace every
+top-level `<include>` and `<rosparam>` to the actual loaded file. Never infer
+the active config from a recipe name alone.
 
-**File naming rule**: bringup files MUST match the hardware — `mid360.*` for
-MID360, `mid360s.*` for Mid360s. Never cross-use.
+Require model-isolated chains:
 
-| Hardware  | JSON config    | SLAM YAML      | Driver launch            | Mapping launch              |
-| --------- | -------------- | -------------- | ------------------------ | --------------------------- |
-| MID360s   | `mid360s.json`  | `mid360s.yaml`  | `msg_mid360s.launch`       | `mapping_mid360.launch`      |
+| Hardware | Driver JSON | FAST_LIO YAML | Driver launch | Mapping launch |
+| --- | --- | --- | --- | --- |
+| MID360 | `MID360_config.json` | `fast_lio_mid360.yaml` | `msg_MID360.launch` | `mapping_mid360.launch` |
+| Mid360s | `MID360s_config.json` | `fast_lio_mid360s.yaml` | `msg_MID360s.launch` | `mapping_mid360s.launch` |
 
-If the existing files don't match the model, rename them. Copy the vendor
-config as the basis for the JSON; adjust YAML and launch paths accordingly.
+Do not route Mid360s through `mapping_mid360.launch` or a shared sensor YAML;
+that hides model-specific message and preprocessing assumptions.
 
 ---
 
@@ -53,7 +54,7 @@ Look for:
 ### 1.2 Read the configured IP from JSON
 
 ```bash
-cat /home/nv/ros1-yopo/src/bringup/config/{model}.json
+cat /home/nv/Localization_ws/bringup/config/<model-config>.json
 ```
 
 Extract these two fields:
@@ -131,7 +132,7 @@ does not belong to any local network interface, `bind()` returns `EADDRNOTAVAIL`
 
 **Diagnosis** — read configured host IP, check interfaces, check port:
 ```bash
-ssh nv@192.168.55.1 "cat src/bringup/config/{model}.json | grep -E 'cmd_data_ip|host_ip'"
+ssh nv@192.168.55.1 "cat /home/nv/Localization_ws/bringup/config/<model-config>.json | grep -E 'cmd_data_ip|host_ip'"
 ssh nv@192.168.55.1 "ip addr show | grep <host_ip>"
 ssh nv@192.168.55.1 "ss -ulpn | grep 56000"
 ```
@@ -221,8 +222,8 @@ the hex dump — look for ASCII in the payload:
 `②` Sync the updated config and add the host secondary IP:
 
 ```bash
-rsync -avz src/bringup/config/{model}.json \
-  nv@192.168.55.1:/home/nv/ros1-yopo/src/bringup/config/{model}.json
+rsync -avz bringup/config/<model-config>.json \
+  nv@192.168.55.1:/home/nv/Localization_ws/bringup/config/<model-config>.json
 ssh nv@192.168.55.1 "sudo ip addr add <host_secondary_ip>/24 dev eth0"
 # Persist via NetworkManager (see 1.3)
 ```
@@ -231,9 +232,9 @@ ssh nv@192.168.55.1 "sudo ip addr add <host_secondary_ip>/24 dev eth0"
 
 ```bash
 ssh nv@192.168.55.1 "source /opt/ros/noetic/setup.bash \
-  && source /home/nv/ros1-yopo/deploy-side/devel/setup.bash \
+  && source /home/nv/Localization_ws/devel/setup.bash \
   && pkill -9 -f livox_ros_driver; pkill -9 -f roslaunch; \
-  sleep 2 && roslaunch bringup msg_{model}.launch xfer_format:=0"
+  sleep 2 && roslaunch bringup <model-driver>.launch xfer_format:=1"
 ```
 
 **Verification**: The log should now show:
@@ -244,7 +245,7 @@ ssh nv@192.168.55.1 "source /opt/ros/noetic/setup.bash \
 successfully set data type ...
 successfully change work mode ...
 [ INFO] livox/imu publish imu data
-[ INFO] livox/lidar publish use PointCloud2 format
+[ INFO] livox/lidar publish use customized format
 ```
 
 ---
@@ -253,7 +254,7 @@ successfully change work mode ...
 
 ### 2.1 Config file location
 
-`src/bringup/config/{model}.json` — referenced by the launch file via:
+`bringup/config/<model-config>.json` — referenced by the model-specific launch:
 
 ```xml
 <param name="user_config_path" type="string"
@@ -338,8 +339,8 @@ successfully change work mode ...
 }
 ```
 
-**Always use the vendor config from `src/linker/livox_ros_driver2/config/`
-as the template — do NOT write from scratch or copy across device types.**
+Edit only the canonical file under `bringup/config/`. Do not search elsewhere
+for launch files or LiDAR JSON/YAML templates, and never copy across models.
 
 ### 2.3 Critical differences: MID360 vs Mid360s
 
@@ -375,16 +376,19 @@ Failed to init livox lidar sdk.
 ### 2.5 Launch param: xfer_format
 
 ```xml
-<arg name="xfer_format" default="0"/>
+<arg name="xfer_format" default="1"/>
 ```
 
-| Value | Driver output type                        | Consumer       |
-| ----- | ----------------------------------------- | -------------- |
-| `0`   | `sensor_msgs::PointCloud2`                | faster_lio, rviz |
-| `1`   | `livox_ros_driver2::CustomMsg` (default)  | Custom nodes   |
+| Value | Driver output type | Point schema |
+| --- | --- | --- |
+| `0` | `sensor_msgs::PointCloud2` | `x,y,z,intensity,tag,line` |
+| `1` | `livox_ros_driver2::CustomMsg` | Custom points with `offset_time,line,tag` |
 
-**Always set `xfer_format=0` when the downstream SLAM is faster_lio
-(`lidar_type: 6`).**
+Choose `xfer_format` only after inspecting the checked-out FAST_LIO enum,
+subscriber, and preprocessing handler. For this repository revision, use
+`xfer_format=1` with `preprocess/lidar_type=1` for MID360 and Mid360s.
+Changing only one side creates a ROS datatype mismatch. Using PointCloud2 with
+a parser for another sensor preserves the ROS datatype but breaks its fields.
 
 ### 2.6 Repository-specific `bd_list` convention
 
@@ -409,40 +413,78 @@ broadcast-code whitelist.
 
 ### 3.1 Config location
 
-`src/bringup/config/{model}.yaml` — loaded by `mapping_{model}.launch`:
+Trace the top-level include to the model-specific mapping launch and YAML:
 
 ```xml
-<rosparam command="load" file="$(find bringup)/config/{model}.yaml" />
+<!-- MID360 -->
+<rosparam command="load" file="$(find bringup)/config/fast_lio_mid360.yaml" />
+<!-- Mid360s -->
+<rosparam command="load" file="$(find bringup)/config/fast_lio_mid360s.yaml" />
 ```
 
 ### 3.2 lidar_type
 
 ```yaml
 preprocess:
-    lidar_type: 6   # <-- critical
+    lidar_type: 1
 ```
 
-| Value | Message type                         | Driver xfer_format |
-| ----- | ------------------------------------ | ------------------ |
-| `1`   | `livox_ros_driver::CustomMsg` (old)  | `1` (custom msg)   |
-| `6`   | `sensor_msgs::PointCloud2`           | `0` (PointCloud2)  |
+Current `FAST_LIO/include/preprocess.h` defines:
 
-Rule: **`lidar_type` must match `xfer_format`**, or the mapping node
-subscribes to the wrong message type and silently receives zero points.
+| Value | Parser | Required input |
+| --- | --- | --- |
+| `1` (`AVIA`) | Livox | `livox_ros_driver2::CustomMsg` |
+| `2` (`VELO16`) | Velodyne | PointCloud2 fields `time,ring` |
+| `3` (`OUST64`) | Ouster | PointCloud2 fields `t,ring,...` |
 
-### 3.3 Common error: No point, mapping finishes immediately
+`laserMapping.cpp` subscribes to CustomMsg only for `AVIA`; all other values
+subscribe to PointCloud2. This revision has no `lidar_type=6`. Other forks may
+add a Livox PointCloud2 handler as type 6; use it only after confirming the
+enum, subscriber, and accepted fields in that exact source revision.
 
-**Error:**
+### 3.3 xfer_format causal chain and branches
+
+Follow the complete chain:
+
+```text
+xfer_format
+  -> driver ROS datatype and point schema
+  -> subscriber selected by lidar_type
+  -> preprocessing handler and required fields
+  -> valid points, datatype rejection, or PCL field warnings
+```
+
+Branch on both values:
+
+1. `xfer_format=1` + `lidar_type=1`: correct in this repository. Livox
+   CustomMsg reaches the AVIA handler and preserves `offset_time`.
+2. `xfer_format=1` + `lidar_type!=1`: publisher is CustomMsg but FAST_LIO
+   subscribes to PointCloud2. Expect a ROS datatype mismatch or no callbacks.
+3. `xfer_format=0` + `lidar_type=1`: publisher is PointCloud2 but FAST_LIO
+   subscribes to CustomMsg. Expect the inverse datatype mismatch.
+4. `xfer_format=0` + `lidar_type=2`: ROS datatypes match but point schemas
+   do not. Livox publishes `tag,line`; Velodyne requests `time,ring`:
+
+```text
+Failed to find match for field 'time'.
+Failed to find match for field 'ring'.
+```
+
+Treat this exact signature as a parser/schema mismatch, not a network fault
+and not a MID360-vs-Mid360s JSON-key fault. Detection has already succeeded.
+Fix the complete pair to `xfer_format=1` + `lidar_type=1`.
+
+5. `xfer_format=0` + a verified Livox PointCloud2 handler (for example type 6
+   in another fork): valid only if source inspection confirms the driver's
+   exact fields are supported.
+
+A pure ROS datatype mismatch can instead produce:
+
 ```
 Using AVIA Lidar (livox_ros_driver::CustomMsg)
 No point, skip this scan!
 finishing mapping
 ```
-
-**Cause**: `lidar_type=1` but the driver publishes `sensor_msgs::PointCloud2`
-(`xfer_format=0`), or vice versa. The subscriber never receives messages.
-
-**Fix**: Set `lidar_type=6` and `xfer_format=0` together.
 
 ### 3.4 Other faster_lio topics
 
@@ -470,8 +512,9 @@ Use this 7-step flow when bringup fails (substitute `{model}`):
 5. ping <lidar_ip>                     ← if no: ARP/cable issue
 5.5. tcpdump -i eth0 udp port 56000  ← if detection OK but FW query fails: capture real LiDAR IP (see 1.7)
 6. catkin build livox_ros_driver2     ← if build failed: package.xml missing?
-7. roslaunch msg_{model}.launch        ← check "Params check failed"
-8. roslaunch mapping_{model}.launch    ← check "lidar_type 6"
+7. trace top-level launch includes      ← record actual JSON, YAML, xfer_format
+8. inspect FAST_LIO enum/subscriber     ← do not assume lidar_type numbering
+9. verify the complete message pair     ← this repo: xfer_format 1 + lidar_type 1
 ```
 
 ---
@@ -487,7 +530,8 @@ Use this 7-step flow when bringup fails (substitute `{model}`):
 | `Destination Host Unreachable` for LiDAR IP                  | Subnet mismatch                 | `ip addr add <host_ip>/24 dev eth0` |
 | `bind failed` + `Create detection socket failed`             | Host IP not assigned to any Jetson interface, or UDP 56000 already in use | ① `ip addr show` verify IP; ② `ss -ulpn \| grep 56000` check port; ③ `sudo ip addr add <host_ip>/24 dev eth0` (see 1.6) |
 | Detection succeeds + `Query livox lidar Fw type failed, the status:-4` | LiDAR IP reset to a different subnet; JSON-configured IP stale | `tcpdump -i eth0 udp port 56000` to capture LiDAR's actual IP → update `{model}.json` + host subnet (see 1.7) |
-| `Using AVIA Lidar (livox_ros_driver::CustomMsg)` → no points | Message type mismatch           | Set `xfer_format=0` + `lidar_type=6` |
+| Repeated missing `time` / `ring` after detection | Livox PointCloud2 parsed as Velodyne (`xfer_format=0`, `lidar_type=2`) | Set `xfer_format=1` + `lidar_type=1` in this repo |
+| `Using AVIA Lidar (livox_ros_driver2::CustomMsg)` → no points | Driver and FAST_LIO use different ROS datatypes | Trace both values; in this repo use `xfer_format=1` + `lidar_type=1` |
 | `Failed to open traj_file: ./Log/traj.txt`                   | Log directory missing           | `mkdir -p /home/nv/ros1-yopo/Log` |
 
 ---
@@ -496,12 +540,11 @@ Use this 7-step flow when bringup fails (substitute `{model}`):
 
 | File                                              | Role                                           |
 | ------------------------------------------------- | ---------------------------------------------- |
-| `src/bringup/launch/msg_{model}.launch`             | Livox driver launch (`xfer_format` here)       |
-| `src/bringup/launch/mapping_{model}.launch`         | faster_lio SLAM launch                         |
-| `src/bringup/config/{model}.json`                   | Livox driver JSON config (NIC + device info)  |
-| `src/bringup/config/{model}.yaml`                   | faster_lio mapping parameters (`lidar_type`)  |
-| `tmux_scripts/infra_scripts/lidar_launch.sh`       | Combined bringup entry point                   |
-| `tmux_scripts/infra_scripts/env.sh`                | Common ROS env pre-sourcing                    |
-| `src/linker/livox_ros_driver2/config/MID360_config.json` | Vendor reference for MID360               |
-| `src/linker/livox_ros_driver2/config/MID360s_config.json`| Vendor reference for Mid360s              |
+| `bringup/launch/msg_MID360*.launch`               | Model-specific driver launch and `xfer_format` |
+| `bringup/launch/mapping_mid360*.launch`           | Model-specific FAST_LIO launch                  |
+| `bringup/config/MID360*_config.json`              | Model-specific Livox network/device JSON        |
+| `bringup/config/fast_lio_mid360*.yaml`            | Model-specific FAST_LIO parameters              |
+| `FAST_LIO/include/preprocess.h`                   | Authoritative `lidar_type` enum and schemas    |
+| `FAST_LIO/src/laserMapping.cpp`                   | Authoritative subscriber branch                 |
+| `livox_ros_driver2/src/lddc.cpp`                  | Authoritative PointCloud2 field schema           |
 | `/usr/local/include/livox_lidar_def.h`             | SDK device type enum (Jetson side)             |

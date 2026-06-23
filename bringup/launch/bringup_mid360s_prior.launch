@@ -1,8 +1,8 @@
 <launch>
   <arg name="bd_list" default="000000000000000" />
   <include file="$(find bringup)/launch/msg_MID360s.launch">
-    <arg name="xfer_format" value="0" />
+    <arg name="xfer_format" value="1" />
     <arg name="bd_list" value="$(arg bd_list)" />
   </include>
-  <include file="$(find bringup)/launch/mapping_mid360_reloc.launch" />
+  <include file="$(find bringup)/launch/mapping_mid360s_reloc.launch" />
 </launch>

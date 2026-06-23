@@ -9,9 +9,9 @@ Host <device-hostname>.local <device-hostname>
   RemoteCommand cd <folder-path> && exec bash -l
   RequestTTY yes
 
-# Example for device {DEVICE} with ros1-yopo workspace:
+# Example for device {DEVICE} with Localization_ws workspace:
 # Host 192.168.55.1
 #   HostName 192.168.55.1
 #   User nv
-#   RemoteCommand cd /home/nv/ros1-yopo && exec bash -l
+#   RemoteCommand cd /home/nv/Localization_ws && exec bash -l
 #   RequestTTY yes

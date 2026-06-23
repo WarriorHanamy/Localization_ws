@@ -1,5 +1,5 @@
 <launch>
-  <rosparam command="load" file="$(find bringup)/config/fast_lio_mid360.yaml" />
+  <rosparam command="load" file="$(find bringup)/config/fast_lio_mid360s.yaml" />
   <rosparam command="load" file="$(find bringup)/config/anomaly_detection.yaml" />
 
   <!-- Override: enable prior map loading for relocalization -->

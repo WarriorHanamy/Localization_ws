@@ -3,7 +3,7 @@
 
 	<arg name="rviz" default="true" />
 
-	<rosparam command="load" file="$(find bringup)/config/mid360.yaml" />
+	<rosparam command="load" file="$(find bringup)/config/fast_lio_mid360.yaml" />
 
 	<param name="wxx/initial_map_from_pcd" type="bool" value="1"/>
 	<param name="feature_extract_enable" type="bool" value="0"/>

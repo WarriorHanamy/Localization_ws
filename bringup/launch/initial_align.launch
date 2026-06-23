@@ -3,7 +3,7 @@
 
 	<arg name="rviz" default="false" />
 
-	<rosparam command="load" file="$(find bringup)/config/mid360.yaml" />
+	<rosparam command="load" file="$(find bringup)/config/fast_lio_mid360.yaml" />
 	<rosparam command="load" file="$(find bringup)/config/initial_align.yaml" />
 
 	<!-- 环境变量！！！！！！！ -->
