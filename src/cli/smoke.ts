@@ -12,6 +12,7 @@
 import { REC_DEVICE_LOC_WS, ROS_DISTRO, REMOTE_USER, REMOTE_HOST_USB, SSH_OPTS, RECIPES, type RecipeName } from "../core/config";
 import { deviceRvizMaximizedCommand, launchNoMachineViewer } from "../core/viewer";
 import { statSync } from "fs";
+import { $ } from "bun";
 
 // ---- utils ----
 
@@ -107,7 +108,9 @@ async function doSmokeDataLink(recipeArg: string): Promise<void> {
   if (!onDeviceHost()) {
     const target = `${REMOTE_USER}@${REMOTE_HOST_USB}`;
     const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
-    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke data_link ${recipeArg}`;
+    const remoteCmd =
+      `cd ${$.escape(REC_DEVICE_LOC_WS)} && ` +
+      `REC_DEVICE_LOC_WS=${$.escape(REC_DEVICE_LOC_WS)} bun run smoke data_link ${$.escape(fullName)}`;
     const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
       stdio: ["inherit", "inherit", "inherit"],
     });
@@ -206,7 +209,9 @@ async function doSmokeFov(recipeArg?: string): Promise<void> {
   if (!onDeviceHost()) {
     const target = `${REMOTE_USER}@${REMOTE_HOST_USB}`;
     const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
-    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke fov ${hardware}`;
+    const remoteCmd =
+      `cd ${$.escape(REC_DEVICE_LOC_WS)} && ` +
+      `REC_DEVICE_LOC_WS=${$.escape(REC_DEVICE_LOC_WS)} bun run smoke fov ${$.escape(hardware)}`;
     const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
       stdio: ["inherit", "inherit", "inherit"],
     });

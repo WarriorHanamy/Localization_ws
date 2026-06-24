@@ -2,7 +2,11 @@ export const ROS_DISTRO = "noetic";
 
 export const REMOTE_HOST_USB = "192.168.55.1";
 export const REMOTE_USER = "nv";
-export const REC_DEVICE_LOC_WS = "/home/nv/Localization_ws";
+const configuredDeviceWorkspace = Bun.env.REC_DEVICE_LOC_WS?.trim();
+export const REC_DEVICE_LOC_WS = configuredDeviceWorkspace || "/home/nv/rec_loc_ws";
+if (!REC_DEVICE_LOC_WS.startsWith("/")) {
+  throw new Error(`REC_DEVICE_LOC_WS must be an absolute path: ${REC_DEVICE_LOC_WS}`);
+}
 
 const SSH_IDENTITY = `${process.env.HOME ?? "~"}/.ssh/id_ed25519`;
 export const SSH_OPTS =

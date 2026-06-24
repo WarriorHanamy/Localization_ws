@@ -1,6 +1,7 @@
 import { RECIPES, type RecipeName, DOCKER_IMAGE, REMOTE_HOST_USB, REMOTE_USER, SSH_OPTS, REC_DEVICE_LOC_WS } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 import { mkdirSync } from "fs";
+import { $ } from "bun";
 
 const PROD_SESSION = "prod";
 const WORKSPACE = getRepoRoot();
@@ -29,7 +30,9 @@ function sshVia(args: string[], needsTty = false): never {
   const target = `${REMOTE_USER}@${REMOTE_HOST_USB}`;
   const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
   if (needsTty) opts.unshift("-t");
-  const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run prod ${args.join(" ")}`;
+  const remoteCmd =
+    `cd ${$.escape(REC_DEVICE_LOC_WS)} && ` +
+    `REC_DEVICE_LOC_WS=${$.escape(REC_DEVICE_LOC_WS)} bun run prod ${args.map((arg) => $.escape(arg)).join(" ")}`;
   const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
     stdio: ["inherit", "inherit", "inherit"],
   });

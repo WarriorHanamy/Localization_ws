@@ -20,7 +20,7 @@ Defined in `src/core/config.ts`:
 
 | Constant            | Value                        | Meaning                          |
 | ------------------- | ---------------------------- | -------------------------------- |
-| `REC_DEVICE_LOC_WS` | `"/home/nv/Localization_ws"` | Device-host workspace root       |
+| `REC_DEVICE_LOC_WS` | `$REC_DEVICE_LOC_WS` (default: `/home/nv/rec_loc_ws`) | Device-host workspace root |
 | (auto)              | `getRepoRoot()`              | Devel-host workspace root        |
 
 Alignment: `bun run sync` (rsync devel-host src/ → device-host `$REC_DEVICE_LOC_WS/`).
