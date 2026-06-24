@@ -141,3 +141,129 @@ bringup/ tarball ───────────► │ HTTP server  │ ◄�
   tag cleanup is needed
 - Layer-aware incremental pulls: code-only changes transfer 10-100 MB,
   not the full 2-5 GB
+
+## ADR 0004: Calibration Workflow — Extrinsic LiDAR-IMU Calibration
+
+**Status:** Accepted
+
+**Context:** LiDAR-IMU calibration (LI-Init) requires Ceres solver for
+optimization and Pixhawk IMU data via MAVROS for extrinsic parameter
+estimation. The SLAM pipeline also transitions to MAVROS IMU
+(`/mavros/imu/data`) as the primary IMU source, replacing the Livox built-in
+IMU (`/livox/imu`). MAVROS is therefore a shared dependency for both
+images.
+
+Physically, the drone has two IMUs:
+- **Pixhawk IMU**: high-accuracy, low-drift, provides absolute gravity
+  reference. Topic: `/mavros/imu/data` (filtered).
+- **Livox IMU**: on the LiDAR, used as fallback. Topic: `/livox/imu`.
+
+Ceres solver is the differentiating dependency — needed only by LI-Init, not
+by the SLAM pipeline. Keeping it out of the main image avoids bloat and
+faster SLAM-only builds.
+
+**Decision:**
+- `ros-noetic-mavros` + `geographiclib-tools` installed in **both** images
+  (`fastlio-jetson` and `fastlio-calib`)
+- Ceres solver (`libceres-dev`) installed **only** in `fastlio-calib`
+- LI-Init package built **only** in `fastlio-calib` (Layer 2)
+- A separate `docker/Dockerfile.calib` defines the calib image
+- `bun run docker-dbuild calib` builds the calib image
+
+**Assumptions:**
+- Pixhawk (or MAVLink-compatible FCU) connected via `/dev/ttyTHS0:921600`
+- LI-Init uses `/mavros/imu/data` (filtered), aligning with the rest of the
+  codebase — no `data_raw` usage
+- Mid360 and Mid360s share `lidar_type: 1` (Livox CustomMsg) for LI-Init
+
+**Consequences:**
+- Two Docker images share MAVROS deps; only Ceres + LI-Init differ
+- The calib image is built on-demand — not in the production SLAM pipeline
+- CI must rebuild both images when MAVROS-related files change
+- MAVROS serial (`/dev/ttyTHS0`) requires `--privileged` (already default)
+
+## ADR 0005: Three-Image Docker Architecture
+
+**Status:** Accepted
+
+**Context:** The calib image (`fastlio-calib`) and SLAM image (`fastlio-jetson`)
+share the vast majority of dependencies: Ubuntu base, ROS Noetic, PCL, Eigen,
+MAVROS, geographiclib, Livox SDK2, and `livox_ros_driver2`. Maintaining two
+independent Dockerfiles (`Dockerfile` and `Dockerfile.calib`) duplicates these
+install steps and risks them diverging.
+
+SLAM builds are frequent (FAST_LIO changes often); calib builds are rare. Base
+image changes are very rare (ROS/driver updates). Separating into three images
+optimizes each build cycle.
+
+**Decision:**
+
+Three Dockerfiles forming a dependency chain:
+
+```
+Dockerfile.base ─┬─→ Dockerfile.prod (SLAM)
+                  └──→ Dockerfile.calib
+```
+
+| Image              | Dockerfile            | Contents                                | Build Frequency |
+| ------------------ | --------------------- | --------------------------------------- | --------------- |
+| `fastlio-base`     | `Dockerfile.base`     | ROS, MAVROS, SDK2, livox_ros_driver2   | Very rare       |
+| `fastlio-jetson`   | `Dockerfile.prod`     | ekf, incr_map, FAST_LIO, bringup       | Frequent        |
+| `fastlio-calib`    | `Dockerfile.calib`    | Ceres, LiDAR_IMU_Init                   | Rare            |
+
+`bun run docker-dbuild` builds base (cached) then SLAM.
+`bun run docker-dbuild calib` builds base (cached) then calib.
+`bun run docker-dbuild base` builds base only.
+
+**Consequences:**
+- Three tags in local Docker registry instead of two
+- Base image rebuild is near-instant when unchanged (Docker layer cache)
+- `docker-build.ts` Orchestrates the dependency chain automatically
+
+## Workspace Filesystem Mapping
+
+Consistent host-to-container mapping for all packages across images:
+
+| Host path                    | Container path                            | Method     | Image    |
+| ---------------------------- | ----------------------------------------- | ---------- | -------- |
+| `docker/entrypoint.sh`       | `/entrypoint.sh`                          | COPY       | base     |
+| `.docker-sdk/livox_sdk2/`    | `/usr/local/lib/` `/usr/local/include/`   | COPY       | base     |
+| `livox_ros_driver2/`           | `/catkin_ws/src/livox_ros_driver2/`       | COPY       | base     |
+| `ekf_quat_pose/`               | `/catkin_ws/src/ekf_quat_pose/`           | COPY       | SLAM     |
+| `incremental_map_publisher/`   | `/catkin_ws/src/incremental_map_publisher/` | COPY     | SLAM     |
+| `FAST_LIO/`                    | `/catkin_ws/src/fast_lio/`                | COPY       | SLAM     |
+| `LiDAR_IMU_Init/`              | `/catkin_ws/src/lidar_imu_init/`          | COPY       | calib    |
+| `bringup/`                     | `/catkin_ws/src/bringup/`                 | bind-mount | runtime  |
+| `bringup/PCD/` (symlink)       | `/catkin_ws/src/fast_lio/PCD/`            | symlink    | prod     |
+
+PCD is stored under `bringup/PCD/` and symlinked into the FAST_LIO runtime path
+at `Dockerfile.prod` build time. Two subdirectories:
+- `bringup/PCD/prior/` — prior maps read by FAST_LIO (insert initial_map.pcd here)
+- `bringup/PCD/post/` — maps exported by FAST_LIO (scans_*.pcd, new_map.pcd)
+
+No separate PCD bind-mount needed — `bringup/` is already bind-mounted. FAST_LIO
+source code reflects this split (C++ paths changed to `PCD/prior/` for reads,
+`PCD/post/` for writes).
+
+## Smoke Test Levels
+
+Tests are structured in two layers, each building on the previous:
+
+```
+smoke_l1.launch          (LiDAR driver + MAVROS, no consumers)
+       │
+       ├──→ smoke_l2_slam.launch   (L1 + FAST_LIO)
+       ├──→ smoke_l2_fov.launch    (L1 + FAST_LIO + FOV crop)
+       └──→ smoke_l2_calib.launch  (L1 + LI-Init)
+```
+
+| Level | Command                          | Image              | Scope                |
+| ----- | -------------------------------- | ------------------ | -------------------- |
+| L1    | `bun run smoke l1 <hw>`         | `fastlio-base`     | Driver frequency     |
+| L2    | `bun run smoke l2-slam <hw>`    | `fastlio-jetson`   | SLAM pipeline + RVIZ |
+| L2    | `bun run smoke l2-fov <hw>`     | `fastlio-jetson`   | FOV overlay + RVIZ   |
+| L2    | `bun run smoke l2-calib <hw>`   | `fastlio-calib`    | Calibration + RVIZ   |
+
+L1 scripts (`container-smoke-l1.sh`) replaces the old `container-calib-smoke.sh`
+and the now-deleted `container-smoke.sh` (which checked the outdated `/livox/imu`
+topic instead of `/mavros/imu/data`).

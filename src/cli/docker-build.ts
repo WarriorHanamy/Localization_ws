@@ -1,19 +1,18 @@
 import { $ } from "bun";
-import { runSSH, checkSSH } from "../core/ssh";
+import { runSSHStreaming, checkSSH } from "../core/ssh";
 import { REC_DEVICE_LOC_WS } from "../core/config";
 
-export async function cmdDockerBuild(): Promise<void> {
-  console.log("[docker-build] Building fastlio-jetson image on Jetson ...");
-  const ok = await checkSSH();
-  if (!ok) {
-    console.log("[docker-build] SSH check failed. Run 'bun run sync' first.");
-    process.exit(1);
-  }
+const TARGETS: Record<string, { dockerfile: string; tag: string; depends?: string }> = {
+  base:    { dockerfile: "docker/Dockerfile.base",  tag: "fastlio-base:latest" },
+  default: { dockerfile: "docker/Dockerfile",       tag: "fastlio-jetson:latest", depends: "base" },
+  calib:   { dockerfile: "docker/Dockerfile.calib", tag: "fastlio-calib:latest", depends: "base" },
+};
 
+function sdkStageCommands(): string {
   const sdkRoot = "/usr/local";
   const sdkStage = `${REC_DEVICE_LOC_WS}/.docker-sdk/livox_sdk2`;
-  const buildCmd = [
-    "set -euo pipefail",
+  return [
+    `set -euo pipefail`,
     `stage=${$.escape(sdkStage)}`,
     `install -d "$stage/lib" "$stage/include"`,
     `test -f ${$.escape(sdkRoot)}/lib/liblivox_lidar_sdk_static.a`,
@@ -25,13 +24,51 @@ export async function cmdDockerBuild(): Promise<void> {
     `install -m 0644 ${$.escape(sdkRoot)}/include/livox_lidar_cfg.h "$stage/include/"`,
     `install -m 0644 ${$.escape(sdkRoot)}/include/livox_lidar_def.h "$stage/include/"`,
     `cd ${$.escape(REC_DEVICE_LOC_WS)}`,
-    `docker build -f docker/Dockerfile -t fastlio-jetson:latest .`,
   ].join("; ");
-  console.log("[docker-build] Staging verified device-host Livox SDK2 (Mid360s enabled) ...");
-  const result = await runSSH(buildCmd, false);
-  if (result.exitCode !== 0) {
-    const detail = result.stderr.trim() || result.stdout.trim() || "no build output";
-    throw new Error(`remote Docker build failed (exit ${result.exitCode}):\n${detail}`);
+}
+
+function buildCommand(dockerfile: string, tag: string): string {
+  return [
+    "set -euo pipefail",
+    `cd ${$.escape(REC_DEVICE_LOC_WS)}`,
+    `docker build -f ${$.escape(dockerfile)} -t ${$.escape(tag)} .`,
+  ].join("; ");
+}
+
+async function buildTarget(target: string): Promise<void> {
+  const cfg = TARGETS[target] ?? TARGETS.default;
+  console.log(`[docker-build] Building ${cfg.tag} (${cfg.dockerfile}) ...`);
+  const exitCode = await runSSHStreaming(buildCommand(cfg.dockerfile, cfg.tag));
+  if (exitCode !== 0) {
+    throw new Error(`${cfg.tag} build failed (exit ${exitCode})`);
   }
-  console.log("[docker-build] Image fastlio-jetson:latest built.");
+  console.log(`[docker-build] ${cfg.tag} built.`);
+}
+
+export async function cmdDockerBuild(target?: string): Promise<void> {
+  const effective = target ?? "default";
+  const cfg = TARGETS[effective];
+  if (!cfg) {
+    console.error(`[docker-build] Unknown target: ${target}`);
+    console.error(`  Options: ${Object.keys(TARGETS).join(", ")}`);
+    process.exit(1);
+  }
+
+  const ok = await checkSSH();
+  if (!ok) {
+    console.log("[docker-build] SSH check failed. Run 'bun run sync' first.");
+    process.exit(1);
+  }
+
+  console.log(`[docker-build] Staging verified device-host Livox SDK2 (Mid360s enabled) ...`);
+  const sdkExitCode = await runSSHStreaming(sdkStageCommands());
+  if (sdkExitCode !== 0) {
+    throw new Error("SDK2 staging failed on device host");
+  }
+
+  // Build dependency chain
+  if (cfg.depends) {
+    await buildTarget(cfg.depends);
+  }
+  await buildTarget(effective);
 }

@@ -62,19 +62,33 @@ export const RSYNC_EXCLUDES = [
   "bringup/resource/",
 ] as const;
 
-export const DOCKER_IMAGE = "fastlio-jetson:latest";
+export const DOCKER_IMAGE_BASE  = "fastlio-base:latest";
+export const DOCKER_IMAGE       = "fastlio-jetson:latest";
+export const DOCKER_IMAGE_CALIB = "fastlio-calib:latest";
 
 export const RECIPES = {
-  // c5pro + dual Mid360s (Mid360s)
-  "c5pro-mid360s":        { launch: "c5pro_slam.launch",       desc: "c5pro + 双 Mid360s slam" },
-  "c5pro-mid360s-map":    { launch: "c5pro_slam_map.launch",   desc: "c5pro + 双 Mid360s slam + 导出图" },
-  "c5pro-mid360s-reloc":  { launch: "c5pro_slam_reloc.launch", desc: "c5pro + 双 Mid360s 重定位" },
-  // c5v1 + single MID360
-  "c5v1-mid360":          { launch: "c5v1_slam.launch",        desc: "c5v1 + 单 MID360 slam" },
-  "c5v1-mid360-map":      { launch: "c5v1_slam_map.launch",    desc: "c5v1 + 单 MID360 slam + 导出图" },
-  "c5v1-mid360-reloc":    { launch: "c5v1_slam_reloc.launch",  desc: "c5v1 + 单 MID360 重定位" },
+  // c5v1
+  "c5v1-livox":         { launch: "c5v1_slam.launch",       imu_src: "livox",  desc: "c5v1 + Livox IMU slam" },
+  "c5v1-mavros":        { launch: "c5v1_slam.launch",       imu_src: "mavros", desc: "c5v1 + MAVROS IMU slam" },
+  "c5v1-livox-map":     { launch: "c5v1_slam_map.launch",   imu_src: "livox",  desc: "c5v1 + Livox slam + map" },
+  "c5v1-mavros-map":    { launch: "c5v1_slam_map.launch",   imu_src: "mavros", desc: "c5v1 + MAVROS slam + map" },
+  "c5v1-livox-reloc":   { launch: "c5v1_slam_reloc.launch", imu_src: "livox",  desc: "c5v1 + Livox reloc" },
+  "c5v1-mavros-reloc":  { launch: "c5v1_slam_reloc.launch", imu_src: "mavros", desc: "c5v1 + MAVROS reloc" },
+  // c5pro
+  "c5pro-livox":        { launch: "c5pro_slam.launch",      imu_src: "livox",  desc: "c5pro + Livox IMU slam" },
+  "c5pro-mavros":       { launch: "c5pro_slam.launch",      imu_src: "mavros", desc: "c5pro + MAVROS IMU slam" },
+  "c5pro-livox-map":    { launch: "c5pro_slam_map.launch",  imu_src: "livox",  desc: "c5pro + Livox slam + map" },
+  "c5pro-mavros-map":   { launch: "c5pro_slam_map.launch",  imu_src: "mavros", desc: "c5pro + MAVROS slam + map" },
+  "c5pro-livox-reloc":  { launch: "c5pro_slam_reloc.launch", imu_src: "livox",  desc: "c5pro + Livox reloc" },
+  "c5pro-mavros-reloc": { launch: "c5pro_slam_reloc.launch", imu_src: "mavros", desc: "c5pro + MAVROS reloc" },
   // smoke
-  "smoke-fov":            { launch: "smoke_fov.launch",        desc: "FOV 裁剪可视化测试" },
+  "l1-livox":           { launch: "smoke_l1.launch",        imu_src: "livox",  desc: "L1 驱动频率 / Livox" },
+  "l1-mavros":          { launch: "smoke_l1.launch",        imu_src: "mavros", desc: "L1 驱动频率 / MAVROS" },
+  "l2-slam-livox":      { launch: "smoke_l2_slam.launch",   imu_src: "livox",  desc: "L2 SLAM / Livox" },
+  "l2-slam-mavros":     { launch: "smoke_l2_slam.launch",   imu_src: "mavros", desc: "L2 SLAM / MAVROS" },
+  "l2-fov-livox":       { launch: "smoke_l2_fov.launch",    imu_src: "livox",  desc: "L2 FOV 裁剪 / Livox" },
+  "l2-fov-mavros":      { launch: "smoke_l2_fov.launch",    imu_src: "mavros", desc: "L2 FOV 裁剪 / MAVROS" },
+  "l2-calib":           { launch: "smoke_l2_calib.launch",  imu_src: "mavros", desc: "L2 标定 (LI-Init)" },
 } as const;
 
 export type RecipeName = keyof typeof RECIPES;

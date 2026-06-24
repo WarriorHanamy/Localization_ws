@@ -1,0 +1,15 @@
+FROM fastlio-base:latest
+
+# Calib-specific dependencies (Ceres solver, not needed in SLAM image)
+RUN apt-get update && apt-get install -y \
+    libgoogle-glog-dev \
+    libgflags-dev \
+    libceres-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# LiDAR-IMU calibration package
+COPY LiDAR_IMU_Init/ /catkin_ws/src/lidar_imu_init/
+RUN . /opt/ros/noetic/setup.sh && \
+    . /catkin_ws/devel/setup.sh && \
+    cd /catkin_ws && \
+    catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release

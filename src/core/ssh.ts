@@ -39,6 +39,18 @@ export async function runSSH(
   return result;
 }
 
+export async function runSSHStreaming(remoteCmd: string): Promise<number> {
+  const target = sshTarget();
+  const opts = SSH_OPTS;
+  const wrapped = `bash -c ${$.escape(remoteCmd)}`;
+  const cmd = [...prefix(), "ssh", ...opts.split(/\s+/), target, wrapped];
+  const proc = Bun.spawnSync(cmd, {
+    stdio: ["inherit", "inherit", "inherit"],
+    env: { ...process.env },
+  });
+  return proc.exitCode;
+}
+
 export async function runSSHDetached(remoteCmd: string): Promise<number> {
   const target = sshTarget();
   const opts = SSH_OPTS;

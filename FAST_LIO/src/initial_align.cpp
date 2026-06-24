@@ -549,7 +549,7 @@ int main(int argc, char** argv)
     pcl::PCDReader reader;
     // string file_name_map_kdtree = initial_map_pcd_name_;
     PointCloudXYZI::Ptr cloud_map(new PointCloudXYZI());
-    string all_points_dir_map_kdtree(string(string(ROOT_DIR) + "PCD/") + initial_map_pcd_name_);
+    string all_points_dir_map_kdtree(string(string(ROOT_DIR) + "PCD/prior/") + initial_map_pcd_name_);
     if( reader.read(all_points_dir_map_kdtree, *cloud_map) == -1 ) 
     {
         std::cout << "\033[1;31m[wxx][initial align] The initial pcd file [" << initial_map_pcd_name_ << "] does not exist!!!" << "\033[0m" << std::endl;

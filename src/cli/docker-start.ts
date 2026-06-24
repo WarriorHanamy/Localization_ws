@@ -29,7 +29,6 @@ export async function startContainer(
       `--privileged`,
       `-e DISPLAY=$DISPLAY`,
       `-v /tmp/.X11-unix:/tmp/.X11-unix`,
-      `-v ${$.escape(REC_DEVICE_LOC_WS)}/PCD:/catkin_ws/src/fast_lio/PCD`,
       `-v ${$.escape(REC_DEVICE_LOC_WS)}/bringup:/catkin_ws/src/bringup`,
       `fastlio-jetson:latest`,
       `roslaunch bringup ${recipe.launch}`,

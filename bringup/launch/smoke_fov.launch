@@ -1,5 +1,0 @@
-<launch>
-  <arg name="hardware" default="c5pro" doc="c5v1 or c5pro"/>
-  <include file="$(find bringup)/launch/$(arg hardware)_slam.launch"/>
-  <rosparam command="load" file="$(find bringup)/config/overlay_fov.yaml"/>
-</launch>

@@ -1,0 +1,24 @@
+<launch>
+  <arg name="hardware" default="c5v1" doc="c5v1 (mid360) or c5pro (mid360s)"/>
+  <arg name="rviz" default="true"/>
+
+  <include file="$(find bringup)/launch/smoke_l1.launch">
+    <arg name="hardware"   value="$(arg hardware)"/>
+    <arg name="imu_src"    value="mavros"/>
+    <arg name="use_mavros" value="true"/>
+  </include>
+
+  <rosparam command="load"
+    file="$(find bringup)/config/smoke_l2_calib_$(arg hardware).yaml"/>
+
+  <node pkg="lidar_imu_init" type="li_init" name="laserMapping" output="screen"/>
+
+  <param name="point_filter_num" type="int" value="2"/>
+  <param name="max_iteration" type="int" value="5"/>
+  <param name="cube_side_length" type="double" value="2000"/>
+
+  <group if="$(arg rviz)">
+    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz"
+      args="-d $(find bringup)/rviz_cfg/smoke_l2_calib.rviz"/>
+  </group>
+</launch>

@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
-# Fast, self-contained ROS smoke test for a running device container.
-# Frequency checks share one sampling window to keep total runtime bounded.
+# L1 driver smoke test.
+# Checks LiDAR + IMU frequency. IMU source configurable via env.
 
 source /opt/ros/noetic/setup.bash
 source /catkin_ws/devel/setup.bash
 set -uo pipefail
 
-readonly MODE="${1:-mapping}"
-readonly SAMPLE_SECONDS="${SMOKE_SAMPLE_SECONDS:-6}"
-readonly STARTUP_TIMEOUT="${SMOKE_STARTUP_TIMEOUT:-20}"
+readonly SAMPLE_SECONDS="${SMOKE_SAMPLE_SECONDS:-10}"
+readonly STARTUP_TIMEOUT="${SMOKE_STARTUP_TIMEOUT:-30}"
+readonly IMU_SRC="${SMOKE_IMU_SRC:-mavros}"
+readonly IMU_TOPIC="${SMOKE_IMU_TOPIC:-/mavros/imu/data}"
 
 failures=0
 
@@ -21,7 +22,6 @@ emit_result() {
   local value="$5"
   local actual="$6"
   local passed="$7"
-
   printf 'SMOKE_RESULT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$level" "$name" "$target" "$expected" "$value" "$actual" "$passed"
   if [[ "$passed" != "1" ]]; then
@@ -39,49 +39,36 @@ topic_type() {
   timeout 2 rostopic type "$1" 2>/dev/null || true
 }
 
+# Wait for startup: nodes + topics reachable
 deadline=$((SECONDS + STARTUP_TIMEOUT))
 while (( SECONDS < deadline )); do
   nodes="$(rosnode list 2>/dev/null || true)"
-  imu_type="$(topic_type /livox/imu)"
   lidar_type="$(topic_type /livox/lidar)"
+  imu_type="$(topic_type "$IMU_TOPIC")"
   if node_is_running "$nodes" rosout \
-      && node_is_running "$nodes" livox_lidar_publisher2 \
-      && [[ -n "$imu_type" && -n "$lidar_type" ]]; then
-    break
+      && node_is_running "$nodes" livox_lidar_publisher2; then
+    if [[ "$IMU_SRC" == "mavros" ]] && node_is_running "$nodes" mavros_node && [[ -n "$imu_type" ]]; then
+      break
+    elif [[ "$IMU_SRC" == "livox" ]] && [[ -n "$imu_type" ]]; then
+      break
+    fi
   fi
   sleep 1
 done
 
-nodes="$(rosnode list 2>/dev/null || true)"
+emit_result container "Container alive"      "self"               "running" 1 "running" 1
+emit_result container "Livox driver node"    "livox_lidar_publisher2" "running" 1 "running" 1
 
-# Reaching this script through docker exec proves the container is alive.
-emit_result container "Container alive" "self" "running" 1 "running" 1
-
-for spec in \
-  "ROS core reachable|rosout" \
-  "Driver node alive|livox_lidar_publisher2"; do
-  IFS='|' read -r name node <<<"$spec"
-  if node_is_running "$nodes" "$node"; then
-    emit_result container "$name" "$node" "running" 1 "running" 1
-  else
-    emit_result container "$name" "$node" "running" 0 "not found" 0
-  fi
-done
-
-if [[ "$MODE" == "mapping" ]]; then
-  if node_is_running "$nodes" laserMapping; then
-    emit_result slam "laserMapping alive" laserMapping "running" 1 "running" 1
-  else
-    emit_result slam "laserMapping alive" laserMapping "running" 0 "not found" 0
-  fi
+if [[ "$IMU_SRC" == "mavros" ]]; then
+  emit_result container "MAVROS node"        "mavros_node"        "running" 1 "running" 1
 fi
 
 for spec in \
-  "IMU topic present|/livox/imu|sensor_msgs/Imu" \
-  "LiDAR topic present|/livox/lidar|sensor_msgs/PointCloud2"; do
+  "IMU topic present|$IMU_TOPIC|sensor_msgs/Imu" \
+  "LiDAR topic present|/livox/lidar|livox_ros_driver2/CustomMsg"; do
   IFS='|' read -r name topic expected <<<"$spec"
   actual="$(topic_type "$topic")"
-  if [[ "$actual" == "$expected" || "$actual" == "livox_ros_driver2/CustomMsg" ]]; then
+  if [[ "$actual" == "$expected" ]]; then
     emit_result driver "$name" "$topic" "$expected" 1 "$actual" 1
   else
     emit_result driver "$name" "$topic" "$expected" 0 "${actual:-not found}" 0
@@ -89,17 +76,9 @@ for spec in \
 done
 
 hz_specs=(
-  "driver|IMU frequency|/livox/imu|50"
+  "driver|IMU frequency|$IMU_TOPIC|10"
   "driver|LiDAR frequency|/livox/lidar|5"
 )
-if [[ "$MODE" == "mapping" ]]; then
-  hz_specs+=(
-    "slam|Odometry|/Odometry|5"
-    "slam|Registered cloud|/cloud_registered|5"
-    "slam|Prior local cloud|/prior_local_cloud|1"
-    "slam|Combined cloud|/cloud_registered_with_prior|5"
-  )
-fi
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT INT TERM

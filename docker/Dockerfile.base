@@ -21,7 +21,14 @@ RUN apt-get update && apt-get install -y \
     ros-noetic-eigen-conversions \
     ros-noetic-tf \
     ros-noetic-tf2-geometry-msgs \
+    ros-noetic-mavros \
+    ros-noetic-mavros-extras \
+    geographiclib-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Geographiclib datasets (MAVROS runtime requirement).
+# MAVROS requires EGM96 geoid model for UAS transformations.
+RUN /opt/ros/noetic/lib/mavros/install_geographiclib_datasets.sh
 
 # Livox SDK2 staged from the device host by `bun run docker-dbuild`.
 # The build command rejects SDK archives without Mid360s support.
@@ -32,17 +39,8 @@ RUN ldconfig
 # Catkin workspace
 RUN mkdir -p /catkin_ws/src
 
-# Layer 1 — stable packages (rarely changed)
+# Livox driver (single stable layer)
 COPY livox_ros_driver2/ /catkin_ws/src/livox_ros_driver2/
-COPY ekf_quat_pose/     /catkin_ws/src/ekf_quat_pose/
-COPY incremental_map_publisher/ /catkin_ws/src/incremental_map_publisher/
-RUN . /opt/ros/noetic/setup.sh && \
-    cd /catkin_ws && \
-    catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release
-
-# Layer 2 — hot packages (frequently changed)
-COPY FAST_LIO/          /catkin_ws/src/fast_lio/
-COPY bringup/           /catkin_ws/src/bringup/
 RUN . /opt/ros/noetic/setup.sh && \
     cd /catkin_ws && \
     catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release

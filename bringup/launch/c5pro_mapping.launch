@@ -1,10 +1,12 @@
 <launch>
 <!-- Launch file for Livox Mid360s LiDAR -->
 
-	<arg name="rviz" default="false" />
+  <arg name="rviz" default="false" />
+  <arg name="imu_src" default="mavros" doc="livox or mavros" />
 
-	<rosparam command="load" file="$(find bringup)/config/c5pro_fastlio_mid360s_config.yaml" />
-	<rosparam command="load" file="$(find bringup)/config/anomaly_detection.yaml" />
+  <rosparam command="load" file="$(find bringup)/config/c5pro_fastlio_mid360s_config.yaml" />
+  <rosparam command="load" file="$(find bringup)/config/imu_$(arg imu_src).yaml" />
+  <rosparam command="load" file="$(find bringup)/config/anomaly_detection.yaml" />
 	<!-- IMU initial position parameters -->
 	<param name="init_imu_pos_x" type="double" value="0"/>
 	<param name="init_imu_pos_y" type="double" value="0"/>

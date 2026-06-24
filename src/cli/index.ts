@@ -26,14 +26,18 @@ Commands:
   dashboard         start web dashboard (auto-launch SLAM + serve frontend)
   dashboard --dev   start in dev mode (Vite HMR proxy)
   dashboard --no-launch  skip auto-launching SLAM pipeline
-  smoke fov                     FOV crop visual smoke test (RVIZ + NoMachine)
-  smoke data_link [recipe]       data-link frequency check (headless, fzf picker)
+  smoke l1-{livox|mavros} <hw>  L1 driver frequency check (headless)
+  smoke l2-slam-{livox|mavros} <hw> L2 SLAM pipeline + RVIZ
+  smoke l2-fov-{livox|mavros} <hw>  L2 SLAM + FOV crop + RVIZ
+  smoke l2-calib <hw>          L2 calibration + RVIZ (always mavros)
   smoke                          show smoke test help
   doc codebase                   open code analysis documentation
   doc pipeline [recipe]          open entity-centric recipe pipelines
 
 Docker commands:
-  docker-dbuild      build fastlio-jetson image on Jetson (SSH)
+  docker-dbuild              build fastlio-jetson (base → prod) on Jetson (SSH)
+  docker-dbuild base         build fastlio-base only
+  docker-dbuild calib        build fastlio-calib (base → calib) on Jetson (SSH)
   docker-push        push image to local registry (from golden Jetson)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
@@ -113,7 +117,7 @@ async function main() {
       break;
     case "docker-dbuild":
     case "docker-build":
-      await cmdDockerBuild();
+      await cmdDockerBuild(args[0]);
       break;
     case "docker-start":
       await cmdDockerStart(args);

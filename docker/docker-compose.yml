@@ -1,16 +1,60 @@
+# Development & reference docker-compose.
+# Production uses `bun run prod` / `bun run smoke`.
+#
+# Usage:
+#   HARDWARE=c5v1 IMU_SRC=mavros docker compose up l1
+#   HARDWARE=c5v1 IMU_SRC=livox  docker compose up l2-slam
+
+x-common: &common
+  network_mode: host
+  ipc: host
+  privileged: true
+  volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix
+    - ./bringup:/catkin_ws/src/bringup
+
+x-env: &env
+  HARDWARE: ${HARDWARE:-c5v1}
+  IMU_SRC:  ${IMU_SRC:-mavros}
+
 services:
-  fastlio:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+  l1:
+    <<: *common
+    image: fastlio-base:latest
+    container_name: fastlio-l1-${HARDWARE:-c5v1}-${IMU_SRC:-mavros}
+    command: roslaunch bringup smoke_l1.launch
+             hardware:=${HARDWARE:-c5v1} imu_src:=${IMU_SRC:-mavros} use_mavros:=${USE_MAVROS:-true}
+    stdin_open: true
+    tty: true
+
+  l2-slam:
+    <<: *common
     image: fastlio-jetson:latest
-    network_mode: host
-    privileged: true
+    container_name: fastlio-l2-slam-${HARDWARE:-c5v1}-${IMU_SRC:-mavros}
     environment:
-      - DISPLAY=${DISPLAY}
-      - ROS_MASTER_URI=http://localhost:11311
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix
-      - ./PCD:/catkin_ws/src/fast_lio/PCD
+      - DISPLAY=${DISPLAY:-:0}
+    command: roslaunch bringup smoke_l2_slam.launch
+             hardware:=${HARDWARE:-c5v1} imu_src:=${IMU_SRC:-mavros}
+    stdin_open: true
+    tty: true
+
+  l2-fov:
+    <<: *common
+    image: fastlio-jetson:latest
+    container_name: fastlio-l2-fov-${HARDWARE:-c5v1}-${IMU_SRC:-mavros}
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+    command: roslaunch bringup smoke_l2_fov.launch
+             hardware:=${HARDWARE:-c5v1} imu_src:=${IMU_SRC:-mavros}
+    stdin_open: true
+    tty: true
+
+  l2-calib:
+    <<: *common
+    image: fastlio-calib:latest
+    container_name: fastlio-l2-calib
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+    command: roslaunch bringup smoke_l2_calib.launch hardware:=${HARDWARE:-c5v1}
     stdin_open: true
     tty: true

@@ -2,8 +2,10 @@
 <!-- Launch file for initial MID360 LiDAR -->
 
 	<arg name="rviz" default="false" />
+	<arg name="imu_src" default="mavros" doc="livox or mavros" />
 
 	<rosparam command="load" file="$(find bringup)/config/c5v1_fastlio_mid360_config.yaml" />
+	<rosparam command="load" file="$(find bringup)/config/imu_$(arg imu_src).yaml" />
 	<rosparam command="load" file="$(find bringup)/config/initial_align.yaml" />
 
 	<!-- 环境变量！！！！！！！ -->

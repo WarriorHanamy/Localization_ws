@@ -1,0 +1,9 @@
+# Workspace package sources
+
+- name: LiDAR_IMU_Init
+  source: https://github.com/hku-mars/LiDAR_IMU_Init.git
+  commit: 66b157afa30bf6637d7f9defa6ddba46f417000b
+  synced: "2026-06-24"
+  modifications:
+    - "livox_ros_driver -> livox_ros_driver2 (CMakeLists.txt, preprocess.h, preprocess.cpp, laserMapping.cpp, package.xml)"
+  purpose: LiDAR-IMU extrinsic calibration via MAVROS IMU data

@@ -8,21 +8,22 @@ const WORKSPACE = getRepoRoot();
 const PROD_LOGS = `${WORKSPACE}/logs`;
 
 const USAGE = `
-Usage: bun run prod <command> [base]
+Usage: bun run prod <command> [recipe]
 
 Commands:
-  slam [base]        Start slam (no map export). Base: c5pro-mid360s | c5v1-mid360
-  slam-map [base]    Start slam + map export
-  reloc [base]       Start relocalization on prior map
+  slam [recipe]      Start slam (no map export)
+  slam-map [recipe]  Start slam + map export
+  reloc [recipe]     Start relocalization on prior map
   start <recipe>     Start with explicit recipe (override)
   stop               Stop production session + containers
   reset              Full reset (stop + kill all processes)
   attach             Attach to production tmux session
   status             Show production status
 
-Base (hardware):
-  c5pro-mid360s      c5pro + 双 Mid360s
-  c5v1-mid360        c5v1 + 单 MID360
+Recipe naming: <hardware>-<service>-<imu_src>
+  hardware: c5v1 | c5pro
+  imu_src:  livox | mavros
+  example:  c5v1-mavros-map, c5pro-livox-reloc, c5v1-mavros
 
 Recipes:
 ${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\n")}
@@ -65,14 +66,15 @@ function readHardwareState(): string | null {
   return (p.exitCode === 0) ? p.stdout.toString().trim() || null : null;
 }
 
-async function doStart(recipe: string): Promise<void> {
-  const launch = RECIPES[recipe as RecipeName]?.launch;
-  if (!launch) {
-    console.error(`[prod] Unknown recipe: ${recipe}`);
+async function doStart(recipeName: string): Promise<void> {
+  const recipe = RECIPES[recipeName as RecipeName];
+  if (!recipe) {
+    console.error(`[prod] Unknown recipe: ${recipeName}`);
     console.error(USAGE);
     process.exit(1);
   }
-  const container = containerName(recipe);
+  const { launch, imu_src } = recipe;
+  const container = containerName(recipeName);
 
   mkdirSync(PROD_LOGS, { recursive: true });
 
@@ -81,7 +83,7 @@ async function doStart(recipe: string): Promise<void> {
   spawn(["docker", "stop", container], { stderr: "ignore" });
   spawn(["docker", "rm", container], { stderr: "ignore" });
 
-  console.log(`[prod] Starting container '${container}' (${launch}) ...`);
+  console.log(`[prod] Starting container '${container}' (${launch}, imu=${imu_src}) ...`);
   const dockerArgs: string[] = [
     "docker", "run", "-d",
     "--name", container,
@@ -94,10 +96,9 @@ async function doStart(recipe: string): Promise<void> {
     );
   }
   dockerArgs.push(
-    "-v", `${WORKSPACE}/PCD:/catkin_ws/src/fast_lio/PCD`,
     "-v", `${WORKSPACE}/bringup:/catkin_ws/src/bringup`,
     DOCKER_IMAGE,
-    "roslaunch", "bringup", launch,
+    "roslaunch", "bringup", launch, `imu_src:=${imu_src}`,
   );
 
   const dockerRun = spawn(dockerArgs);
