@@ -20,7 +20,6 @@
     "docker-dbuild": "bun src/cli/index.ts docker-dbuild",
     "docker-start": "bun src/cli/index.ts docker-start",
     "docker-shell": "bun src/cli/index.ts docker-shell",
-    "docker-smoke": "bun src/cli/index.ts docker-smoke",
     "prod": "bun src/cli/index.ts prod",
     "help": "bun src/cli/index.ts --help"
   },

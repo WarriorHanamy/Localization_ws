@@ -1,10 +1,10 @@
-import { $ } from "bun";
 import { existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { spawn } from "bun";
 import { runSSH, runSSHDetached } from "../core/ssh";
 import { ROS_DISTRO, REC_DEVICE_LOC_WS, RUSTDESK_ID } from "../core/config";
+import { deviceRvizMaximizedCommand, launchNoMachineViewer } from "../core/viewer";
 
 function rustdeskPassword(): string {
   const env = process.env.RUSTDESK_PASS;
@@ -32,18 +32,6 @@ function launchRustdesk(): void {
   });
 }
 
-function launchVNC(): void {
-  const viewers = ["gvncviewer", "vncviewer"];
-  const viewer = Bun.which("gvncviewer") || Bun.which("vncviewer");
-  const target = "192.168.55.1:0";
-  if (!viewer) {
-    console.log(`[l10n] VNC viewer not found. Open manually with: gvncviewer ${target}`);
-    return;
-  }
-  console.log(`[l10n] Opening VNC viewer: ${viewer} ${target}`);
-  spawn([viewer, target], { stdout: "ignore", stderr: "ignore" });
-}
-
 const PRESETS: Record<string, string> = {
   "fast-lio": `${REC_DEVICE_LOC_WS}/FAST_LIO/rviz_cfg/loam_livox.rviz`,
   livox: `${REC_DEVICE_LOC_WS}/livox_ros_driver2/config/display_point_cloud_ROS1.rviz`,
@@ -51,7 +39,7 @@ const PRESETS: Record<string, string> = {
 
 export interface RvizArgs {
   config?: string;
-  viewer?: "vnc" | "rustdesk" | "none";
+  viewer?: "nomachine" | "rustdesk" | "none";
 }
 
 export async function cmdRviz(args: RvizArgs): Promise<void> {
@@ -59,24 +47,23 @@ export async function cmdRviz(args: RvizArgs): Promise<void> {
   const rvizCfg = PRESETS[key] || `${REC_DEVICE_LOC_WS}/${key}`;
 
   console.log(`[l10n] Launching RViz (${key}) on Jetson display :0 ...`);
-  const rvizCmd = [
-    `export DISPLAY=:0 &&`,
-    `source /opt/ros/${ROS_DISTRO}/setup.bash &&`,
-    `source ${$.escape(REC_DEVICE_LOC_WS)}/devel/setup.bash &&`,
-    `rviz -d ${$.escape(rvizCfg)}`,
-  ].join(" ");
+  const rvizCmd = deviceRvizMaximizedCommand(
+    rvizCfg,
+    ROS_DISTRO,
+    `${REC_DEVICE_LOC_WS}/devel/setup.bash`,
+  );
   const rc = await runSSHDetached(rvizCmd);
   if (rc !== 0) {
     console.log("[l10n] Failed to launch RViz. Is the Jetson display available?");
     return;
   }
 
-  const viewer = args.viewer || "vnc";
+  const viewer = args.viewer || "nomachine";
   if (viewer === "none") {
     console.log("[l10n] Viewer disabled. RViz is running on the Jetson display.");
   } else if (viewer === "rustdesk") {
     launchRustdesk();
   } else {
-    launchVNC();
+    launchNoMachineViewer();
   }
 }

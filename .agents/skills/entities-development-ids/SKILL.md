@@ -122,7 +122,7 @@ Image contents are frozen at build time. To update container launch files or con
 | Sync code to device         | `bun run sync`                                        |
 | Build Docker image          | `bun run docker-dbuild`                               |
 | Start container             | `bun run docker-start --recipe <name>`                |
-| Smoke test container        | `bun run docker-smoke <recipe>`                       |
+
 | Shell into container        | `bun run docker-shell <recipe>`                       |
 | List device-host processes  | `ssh nv@192.168.55.1 'pgrep -af <pattern>'`           |
 | List containers             | `ssh nv@192.168.55.1 'docker ps -a'`                  |
@@ -134,5 +134,4 @@ Image contents are frozen at build time. To update container launch files or con
 ## 7. Development vs Deployment
 
 - **`smoke.ts`**: checks a **device-host** native ROS deployment (catkin build, no Docker)
-- **`docker-smoke.ts`**: checks a **device-container** deployment (Docker image, internal ROS)
 - Device-host never runs TypeScript; the Bun CLI runs on the **devel-host** and bridges to both device targets via SSH

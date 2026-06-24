@@ -7,7 +7,6 @@ import { cmdSmoke } from "./smoke";
 import { cmdDockerBuild } from "./docker-build";
 import { cmdDockerStart } from "./docker-start";
 import { cmdDockerShell } from "./docker-shell";
-import { cmdDockerSmoke } from "./docker-smoke";
 import { cmdProd } from "./prod";
 import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
@@ -24,7 +23,7 @@ Commands:
   dashboard         start web dashboard (auto-launch SLAM + serve frontend)
   dashboard --dev   start in dev mode (Vite HMR proxy)
   dashboard --no-launch  skip auto-launching SLAM pipeline
-  smoke fov                     FOV crop visual smoke test (RVIZ + VNC)
+  smoke fov                     FOV crop visual smoke test (RVIZ + NoMachine)
   smoke data_link [recipe]       data-link frequency check (headless, fzf picker)
   smoke                          show smoke test help
 
@@ -32,7 +31,6 @@ Docker commands:
   docker-dbuild      build fastlio-jetson image on Jetson (SSH)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
-  docker-smoke       start and smoke-test a device container
 
 Production (tmux + docker):
   prod start --recipe <name>  start production pipeline
@@ -46,7 +44,7 @@ ${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\
   help              show this message
 
 Presets for rviz: fast-lio (default), livox
-  --viewer vnc|rustdesk|none   (default: vnc)
+  --viewer nomachine|rustdesk|none   (default: nomachine)
 
 Packages: ${WORKSPACE_PKGS.join(", ")}
 `;
@@ -78,14 +76,14 @@ async function main() {
     case "rviz": {
       const viewerFlag = args.indexOf("--viewer");
       const viewer = viewerFlag !== -1
-        ? (args[viewerFlag + 1] as RvizArgs["viewer"]) || "vnc"
-        : "vnc";
+        ? (args[viewerFlag + 1] as RvizArgs["viewer"]) || "nomachine"
+        : "nomachine";
       const configArg = viewerFlag !== -1
         ? args.slice(0, viewerFlag)[0]
         : args[0];
       await cmdRviz({
         config: configArg || undefined,
-        viewer: viewerFlag !== -1 ? viewer : "vnc",
+        viewer: viewerFlag !== -1 ? viewer : "nomachine",
       });
       break;
     }
@@ -111,9 +109,6 @@ async function main() {
       break;
     case "docker-shell":
       await cmdDockerShell(args);
-      break;
-    case "docker-smoke":
-      await cmdDockerSmoke(args);
       break;
     case "prod":
       await cmdProd(args);

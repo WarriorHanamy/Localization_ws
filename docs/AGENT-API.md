@@ -63,7 +63,7 @@ prod start  # no recipe → opens fzf menu
 | ------------------------ | -------------------------------- | ------------------------------------- |
 | **Connectivity check**  | `bun run check`                  | SSH + remote toolchain verification    |
 | **Smoke test**          | `bun run smoke [--level slam]`   | FAST-LIO smoke test checklist          |
-| **Docker smoke**        | `bun run docker-smoke <cont>`    | Start + smoke-test device container    |
+
 
 ---
 

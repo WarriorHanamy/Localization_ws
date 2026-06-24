@@ -5,11 +5,12 @@
  * all launched via Docker containers.
  *
  * Usage:
- *   bun run smoke fov                    # FOV crop visual comparison (RVIZ + VNC)
+ *   bun run smoke fov                    # FOV crop visual comparison (RVIZ + NoMachine)
  *   bun run smoke data_link <recipe>    # data-link frequency check (headless)
  *   bun run smoke                        # show help
  */
 import { REC_DEVICE_LOC_WS, ROS_DISTRO, REMOTE_USER, REMOTE_HOST_USB, SSH_OPTS, RECIPES, type RecipeName } from "../core/config";
+import { deviceRvizMaximizedCommand, launchNoMachineViewer } from "../core/viewer";
 import { statSync } from "fs";
 
 // ---- utils ----
@@ -193,48 +194,43 @@ async function doSmokeFov(recipeArg?: string): Promise<void> {
     process.exit(1);
   }
   const { fullName } = resolved;
-  const hardware = fullName; // "mid360" or "mid360s"
+  // Recipe state may contain a mapping variant, but smoke_fov.launch accepts
+  // only the physical hardware suffix.
+  const hardware = fullName.includes("mid360s") ? "mid360s" : "mid360";
 
   const SESSION = "smoke-fov";
   const containerName = "fastlio-smoke-fov";
-    const rvizCfg = `${REC_DEVICE_LOC_WS}/src/bringup/rviz_cfg/smoke_fov_test.rviz`;
+  const rvizCfg = `${REC_DEVICE_LOC_WS}/bringup/rviz_cfg/smoke_fov_test.rviz`;
 
-  // Devel-host: open VNC viewer, then SSH bridge with TTY
+  // Devel-host: start the complete device pipeline before opening NoMachine.
   if (!onDeviceHost()) {
     const target = `${REMOTE_USER}@${REMOTE_HOST_USB}`;
-    const vncViewer = Bun.which("gvncviewer") || Bun.which("vncviewer");
-    if (vncViewer) {
-      Bun.spawn([vncViewer, "192.168.55.1:0"], { stdout: "ignore", stderr: "ignore" });
-      console.log(`[smoke] VNC viewer opened: ${vncViewer} 192.168.55.1:0`);
-    } else {
-      console.log("[smoke] Install gvncviewer or vncviewer to see RVIZ remotely.");
-      console.log("[smoke]   Arch:  sudo pacman -S gtk-vnc");
-      console.log("[smoke]   macOS: brew install tigervnc-viewer");
-    }
     const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
-    opts.unshift("-t");
-    const recipePart = recipeArg ? ` ${recipeArg}` : "";
-    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke fov${recipePart}`;
+    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke fov ${hardware}`;
     const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
       stdio: ["inherit", "inherit", "inherit"],
     });
-    process.exit(proc.exitCode);
+    if (proc.exitCode !== 0) process.exit(proc.exitCode);
+
+    try {
+      launchNoMachineViewer();
+    } catch (error) {
+      console.error(`[smoke] ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+
+    if (process.stdin.isTTY) {
+      console.log("[smoke] Attaching device session (detach: Ctrl-B, d) ...");
+      const attach = Bun.spawnSync([
+        "ssh", "-t", ...opts, target, `tmux attach-session -t ${SESSION}`,
+      ], { stdio: ["inherit", "inherit", "inherit"] });
+      process.exit(attach.exitCode);
+    }
+    return;
   }
 
   // ---- Below runs on device-host ----
   Bun.spawnSync(["tmux", "kill-session", "-t", SESSION], { stderr: "ignore" });
-
-  // Ensure x11vnc is sharing display :0 for devel-host VNC viewer
-  Bun.spawnSync(["pkill", "x11vnc", "--older", "10"], { stderr: "ignore", stdout: "ignore" });
-  const vncCheck = Bun.spawnSync(["pgrep", "x11vnc"], { stderr: "ignore", stdout: "pipe" });
-  if (vncCheck.exitCode !== 0) {
-    console.log("[smoke] Starting x11vnc for display :0 ...");
-    Bun.spawn(["x11vnc", "-display", ":0", "-forever", "-quiet", "-shared"], {
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-    await Bun.sleep(1);
-  }
 
   // Start Docker container locally
   console.log(`[smoke] Starting container '${containerName}' ...`);
@@ -263,17 +259,18 @@ async function doSmokeFov(recipeArg?: string): Promise<void> {
   Bun.spawnSync(["tmux", "send-keys", "-t", `${SESSION}:slam`,
     `docker logs -f ${containerName} 2>&1`, "Enter"]);
 
-  // RVIZ window (runs natively on display :0 — viewed via VNC)
+  // RVIZ window (runs natively on display :0 — viewed via NoMachine)
   Bun.spawnSync(["tmux", "new-window", "-t", SESSION, "-n", "rviz"]);
+  const rvizCommand = deviceRvizMaximizedCommand(rvizCfg, ROS_DISTRO);
   Bun.spawnSync(["tmux", "send-keys", "-t", `${SESSION}:rviz`,
-    `sleep 6 && export DISPLAY=:0 && source /opt/ros/${ROS_DISTRO}/setup.bash && rviz -d ${rvizCfg}`, "Enter"]);
+    `sleep 6 && ${rvizCommand}`, "Enter"]);
 
   Bun.spawnSync(["tmux", "select-window", "-t", `${SESSION}:slam`]);
 
   console.log(`[smoke] FOV smoke test started. Session: ${SESSION}`);
   console.log(`[smoke]   Container: ${containerName}`);
   console.log(`[smoke]   Window 'slam': container log`);
-  console.log(`[smoke]   Window 'rviz': RViz on display :0 (view via VNC)`);
+  console.log(`[smoke]   Window 'rviz': RViz on display :0 (view via NoMachine)`);
 
   if (process.stdin.isTTY) {
     console.log("[smoke] Attaching (detach: Ctrl-B, d) ...");
@@ -300,7 +297,7 @@ export async function cmdSmoke(args: string[]): Promise<void> {
   }
 
   console.log("[smoke] smoke test commands:");
-  console.log("  bun run smoke fov                     FOV crop visual check (RVIZ + VNC)");
+  console.log("  bun run smoke fov                     FOV crop visual check (RVIZ + NoMachine)");
   console.log("  bun run smoke data_link <recipe>      data-link frequency check (headless)");
   console.log(`  Recipes: ${Object.keys(RECIPES).sort().join(" ")}`);
 }
