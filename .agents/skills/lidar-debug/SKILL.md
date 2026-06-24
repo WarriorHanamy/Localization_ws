@@ -27,10 +27,10 @@ Require model-isolated chains:
 
 | Hardware | Driver JSON | FAST_LIO YAML | Driver launch | Mapping launch |
 | --- | --- | --- | --- | --- |
-| MID360 | `MID360_config.json` | `fast_lio_mid360.yaml` | `msg_MID360.launch` | `mapping_mid360.launch` |
-| Mid360s | `MID360s_config.json` | `fast_lio_mid360s.yaml` | `msg_MID360s.launch` | `mapping_mid360s.launch` |
+| MID360 | `c5v1_livox_mid360_config.json` | `c5v1_fastlio_mid360_config.yaml` | `c5v1_livox.launch` | `c5v1_mapping.launch` |
+| Mid360s | `c5pro_livox_mid360s_config.json` | `c5pro_fastlio_mid360s_config.yaml` | `c5pro_livox.launch` | `c5pro_mapping.launch` |
 
-Do not route Mid360s through `mapping_mid360.launch` or a shared sensor YAML;
+Do not route Mid360s through `c5v1_mapping.launch` or a shared sensor YAML;
 that hides model-specific message and preprocessing assumptions.
 
 ---
@@ -344,7 +344,7 @@ for launch files or LiDAR JSON/YAML templates, and never copy across models.
 
 ### 2.3 Critical differences: MID360 vs Mid360s
 
-| Aspect                | MID360 (`config/MID360_config.json`)          | Mid360s (`config/MID360s_config.json`)         |
+| Aspect                | MID360 (`config/c5v1_livox_mid360_config.json`)          | Mid360s (`config/c5pro_livox_mid360s_config.json`)         |
 | --------------------- | --------------------------------------------- | ---------------------------------------------- |
 | Key name              | `"MID360"` (uppercase)                        | `"Mid360s"` (mixed case, with `s`)             |
 | `host_net_info`       | **Object** (each port has its own IP field)   | **Array** (single `host_ip` per entry)         |
@@ -362,7 +362,7 @@ Failed to init livox lidar sdk.
 **Likely causes (in order):**
 
 1. The device-keyed section name does not match the hardware. Use the correct
-   vendor template (`MID360_config.json` or `MID360s_config.json`). The section
+   vendor template (`c5v1_livox_mid360_config.json` or `c5pro_livox_mid360s_config.json`). The section
    key and `host_net_info` format must both be consistent with the hardware.
 2. `host_net_info` structure mismatches SDK expectation (Object vs Array).
 3. The LiDAR is not reachable on the network (see Layer 1).
@@ -398,7 +398,7 @@ top-level declarations as `default=`, and pass them into an `<include>` with
 `value="$(arg bd_list)"`.
 
 Do not put the LiDAR IP in `bd_list`. Device selection and network endpoints
-come from `bringup/config/MID360_config.json` or `MID360s_config.json`. The
+come from `bringup/config/c5v1_livox_mid360_config.json` or `c5pro_livox_mid360s_config.json`. The
 current C++ startup path calls `InitLdsLidar(user_config_path)` and does not
 read the launch-only `cmdline_str` parameter, so deriving `bd_list` from
 `lidar_configs[0].ip` is misleading and must not be done in `docker-start`.
@@ -417,9 +417,9 @@ Trace the top-level include to the model-specific mapping launch and YAML:
 
 ```xml
 <!-- MID360 -->
-<rosparam command="load" file="$(find bringup)/config/fast_lio_mid360.yaml" />
+<rosparam command="load" file="$(find bringup)/config/c5v1_fastlio_mid360_config.yaml" />
 <!-- Mid360s -->
-<rosparam command="load" file="$(find bringup)/config/fast_lio_mid360s.yaml" />
+<rosparam command="load" file="$(find bringup)/config/c5pro_fastlio_mid360s_config.yaml" />
 ```
 
 ### 3.2 lidar_type
@@ -495,7 +495,7 @@ common:
 ```
 
 Confirm topics match by inspecting the driver launch file
-(`msg_{model}.launch`) — no explicit topic remaps; default topic path is
+(`{platform}_livox.launch`) — no explicit topic remaps; default topic path is
 `/livox/lidar` and `/livox/imu`.
 
 ---
@@ -526,7 +526,7 @@ Use this 7-step flow when bringup fails (substitute `{model}`):
 | `ROS_DISTRO: unbound variable`                                | ROS env not exported before source | Add to `env.sh`                                        |
 | `cannot launch node of type [...] livox_ros_driver2`         | catkin skipped the package      | Generate `package.xml`, rebuild                        |
 | `kLivoxLidarTypeMid360s is not a member`                     | SDK too old for this driver     | Add missing enum to `/usr/local/include/livox_lidar_def.h` |
-| `Params check failed, all livox lidars config is empty`      | JSON key/structure mismatch     | Use correct vendor config (`MID360_config.json` / `MID360s_config.json`) |
+| `Params check failed, all livox lidars config is empty`      | JSON key/structure mismatch     | Use correct vendor config (`c5v1_livox_mid360_config.json` / `c5pro_livox_mid360s_config.json`) |
 | `Destination Host Unreachable` for LiDAR IP                  | Subnet mismatch                 | `ip addr add <host_ip>/24 dev eth0` |
 | `bind failed` + `Create detection socket failed`             | Host IP not assigned to any Jetson interface, or UDP 56000 already in use | ① `ip addr show` verify IP; ② `ss -ulpn \| grep 56000` check port; ③ `sudo ip addr add <host_ip>/24 dev eth0` (see 1.6) |
 | Detection succeeds + `Query livox lidar Fw type failed, the status:-4` | LiDAR IP reset to a different subnet; JSON-configured IP stale | `tcpdump -i eth0 udp port 56000` to capture LiDAR's actual IP → update `{model}.json` + host subnet (see 1.7) |
@@ -540,10 +540,10 @@ Use this 7-step flow when bringup fails (substitute `{model}`):
 
 | File                                              | Role                                           |
 | ------------------------------------------------- | ---------------------------------------------- |
-| `bringup/launch/msg_MID360*.launch`               | Model-specific driver launch and `xfer_format` |
-| `bringup/launch/mapping_mid360*.launch`           | Model-specific FAST_LIO launch                  |
-| `bringup/config/MID360*_config.json`              | Model-specific Livox network/device JSON        |
-| `bringup/config/fast_lio_mid360*.yaml`            | Model-specific FAST_LIO parameters              |
+| `bringup/launch/c5v1_livox.launch` / `c5pro_livox.launch`            | Model-specific driver launch and `xfer_format` |
+| `bringup/launch/c5v1_mapping.launch` / `c5pro_mapping.launch`        | Model-specific FAST_LIO launch                  |
+| `bringup/config/c5v1_livox_mid360_config.json` / `c5pro_livox_mid360s_config.json` | Model-specific Livox network/device JSON        |
+| `bringup/config/c5v1_fastlio_mid360_config.yaml` / `c5pro_fastlio_mid360s_config.yaml` | Model-specific FAST_LIO parameters              |
 | `FAST_LIO/include/preprocess.h`                   | Authoritative `lidar_type` enum and schemas    |
 | `FAST_LIO/src/laserMapping.cpp`                   | Authoritative subscriber branch                 |
 | `livox_ros_driver2/src/lddc.cpp`                  | Authoritative PointCloud2 field schema           |

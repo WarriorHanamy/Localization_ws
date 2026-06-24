@@ -3,7 +3,7 @@
 
 	<arg name="rviz" default="false" />
 
-	<rosparam command="load" file="$(find bringup)/config/fast_lio_mid360s.yaml" />
+	<rosparam command="load" file="$(find bringup)/config/c5pro_fastlio_mid360s_config.yaml" />
 	<rosparam command="load" file="$(find bringup)/config/anomaly_detection.yaml" />
 	<!-- IMU initial position parameters -->
 	<param name="init_imu_pos_x" type="double" value="0"/>

@@ -1,7 +1,7 @@
 <launch>
   <arg name="bd_list" default="000000000000000" />
-  <include file="$(find bringup)/launch/msg_MID360.launch">
+  <include file="$(find bringup)/launch/c5v1_livox.launch">
     <arg name="bd_list" value="$(arg bd_list)" />
   </include>
-  <include file="$(find bringup)/launch/mapping_mid360_reloc.launch" />
+  <include file="$(find bringup)/launch/c5v1_mapping_reloc.launch" />
 </launch>

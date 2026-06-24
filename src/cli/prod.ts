@@ -8,14 +8,21 @@ const WORKSPACE = getRepoRoot();
 const PROD_LOGS = `${WORKSPACE}/logs`;
 
 const USAGE = `
-Usage: bun run prod <command> [args]
+Usage: bun run prod <command> [base]
 
 Commands:
-  start <recipe>     Start production pipeline in tmux (clean first)
+  slam [base]        Start slam (no map export). Base: c5pro-mid360s | c5v1-mid360
+  slam-map [base]    Start slam + map export
+  reloc [base]       Start relocalization on prior map
+  start <recipe>     Start with explicit recipe (override)
   stop               Stop production session + containers
   reset              Full reset (stop + kill all processes)
   attach             Attach to production tmux session
   status             Show production status
+
+Base (hardware):
+  c5pro-mid360s      c5pro + 双 Mid360s
+  c5v1-mid360        c5v1 + 单 MID360
 
 Recipes:
 ${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\n")}
@@ -49,6 +56,13 @@ function spawn(cmd: string[], opts: Record<string, unknown> = {}): { exitCode: n
 
 function run(cmd: string[]): void {
   spawn(cmd, { stdio: ["inherit", "inherit", "inherit"] });
+}
+
+function readHardwareState(): string | null {
+  const p = Bun.spawnSync(["cat", "/tmp/smoke-hardware"], {
+    stdout: "pipe", stderr: "ignore",
+  });
+  return (p.exitCode === 0) ? p.stdout.toString().trim() || null : null;
 }
 
 async function doStart(recipe: string): Promise<void> {
@@ -199,6 +213,17 @@ async function doStatus(): Promise<void> {
   }
 }
 
+async function doProdByMode(mode: string, baseOverride?: string): Promise<void> {
+  const base = baseOverride || readHardwareState();
+  if (!base) {
+    console.error(`[prod] No hardware state and no base specified.`);
+    console.error("[prod] Run 'smoke data_link' first to select hardware.");
+    process.exit(1);
+  }
+  const recipe = mode ? `${base}-${mode}` : base;
+  await doStart(recipe);
+}
+
 export async function cmdProd(args: string[]): Promise<void> {
   const cmd = args[0];
 
@@ -209,11 +234,20 @@ export async function cmdProd(args: string[]): Promise<void> {
 
   if (!onDeviceHost()) {
     const needsTty = process.stdin.isTTY &&
-      (cmd === "start" || cmd === "attach" || cmd === undefined);
+      (["slam", "slam-map", "reloc", "start", "attach"].includes(cmd) || cmd === undefined);
     sshVia(args, needsTty);
   }
 
   switch (cmd) {
+    case "slam":
+      await doProdByMode("", args[1]);
+      break;
+    case "slam-map":
+      await doProdByMode("map", args[1]);
+      break;
+    case "reloc":
+      await doProdByMode("reloc", args[1]);
+      break;
     case "start": {
       let recipeName = args[1];
       if (!recipeName || !RECIPES[recipeName as RecipeName]) {

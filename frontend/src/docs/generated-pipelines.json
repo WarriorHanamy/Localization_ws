@@ -1,0 +1,521 @@
+[
+  {
+    "name": "mid360",
+    "description": "single MID360 (hardware base)",
+    "launch": "c5v1_slam.launch",
+    "launchChain": [
+      "c5v1_slam.launch",
+      "c5v1_livox.launch",
+      "c5v1_mapping.launch"
+    ],
+    "configFiles": [
+      "c5v1_fastlio_mid360_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5v1_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5v1_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5v1_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5v1_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "rviz",
+        "pkg": "rviz",
+        "type": "rviz",
+        "source": "c5v1_mapping.launch",
+        "optional": true
+      }
+    ],
+    "hardware": "MID360",
+    "mode": "mapping",
+    "components": [
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "mid360s",
+    "description": "dual MID360s (hardware base)",
+    "launch": "c5pro_slam.launch",
+    "launchChain": [
+      "c5pro_slam.launch",
+      "c5pro_livox.launch",
+      "c5pro_mapping.launch"
+    ],
+    "configFiles": [
+      "c5pro_fastlio_mid360s_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5pro_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5pro_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5pro_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5pro_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "rviz",
+        "pkg": "rviz",
+        "type": "rviz",
+        "source": "c5pro_mapping.launch",
+        "optional": true
+      }
+    ],
+    "hardware": "MID360s",
+    "mode": "mapping",
+    "components": [
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "mapping-mid360",
+    "description": "mid360 + mapping, no prior",
+    "launch": "c5v1_slam.launch",
+    "launchChain": [
+      "c5v1_slam.launch",
+      "c5v1_livox.launch",
+      "c5v1_mapping.launch"
+    ],
+    "configFiles": [
+      "c5v1_fastlio_mid360_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5v1_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5v1_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5v1_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5v1_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "rviz",
+        "pkg": "rviz",
+        "type": "rviz",
+        "source": "c5v1_mapping.launch",
+        "optional": true
+      }
+    ],
+    "hardware": "MID360",
+    "mode": "mapping",
+    "components": [
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "mapping-mid360-prior",
+    "description": "mid360 + mapping, prior map",
+    "launch": "c5v1_slam_prior.launch",
+    "launchChain": [
+      "c5v1_slam_prior.launch",
+      "c5v1_livox.launch",
+      "c5v1_mapping_reloc.launch"
+    ],
+    "configFiles": [
+      "c5v1_fastlio_mid360_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5v1_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5v1_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5v1_mapping_reloc.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5v1_mapping_reloc.launch",
+        "optional": false
+      }
+    ],
+    "hardware": "MID360",
+    "mode": "prior",
+    "components": [
+      "Prior PCD",
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "mapping-mid360-reloc",
+    "description": "mid360 + mapping, prior + align",
+    "launch": "c5v1_slam_reloc.launch",
+    "launchChain": [
+      "c5v1_slam_reloc.launch",
+      "c5v1_livox.launch",
+      "c5v1_mapping_reloc.launch"
+    ],
+    "configFiles": [
+      "initial_align.yaml",
+      "c5v1_fastlio_mid360_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "initial_align",
+        "pkg": "fast_lio",
+        "type": "initial_align",
+        "source": "c5v1_slam_reloc.launch",
+        "optional": false
+      },
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5v1_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5v1_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5v1_mapping_reloc.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5v1_mapping_reloc.launch",
+        "optional": false
+      }
+    ],
+    "hardware": "MID360",
+    "mode": "relocation",
+    "components": [
+      "Prior PCD",
+      "Initial Align",
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "mapping-mid360s",
+    "description": "mid360s + mapping, no prior",
+    "launch": "c5pro_slam.launch",
+    "launchChain": [
+      "c5pro_slam.launch",
+      "c5pro_livox.launch",
+      "c5pro_mapping.launch"
+    ],
+    "configFiles": [
+      "c5pro_fastlio_mid360s_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5pro_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5pro_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5pro_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5pro_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "rviz",
+        "pkg": "rviz",
+        "type": "rviz",
+        "source": "c5pro_mapping.launch",
+        "optional": true
+      }
+    ],
+    "hardware": "MID360s",
+    "mode": "mapping",
+    "components": [
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "mapping-mid360s-prior",
+    "description": "mid360s + mapping, prior map",
+    "launch": "c5pro_slam_prior.launch",
+    "launchChain": [
+      "c5pro_slam_prior.launch",
+      "c5pro_livox.launch",
+      "c5pro_mapping_reloc.launch"
+    ],
+    "configFiles": [
+      "c5pro_fastlio_mid360s_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5pro_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5pro_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5pro_mapping_reloc.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5pro_mapping_reloc.launch",
+        "optional": false
+      }
+    ],
+    "hardware": "MID360s",
+    "mode": "prior",
+    "components": [
+      "Prior PCD",
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "mapping-mid360s-reloc",
+    "description": "mid360s + mapping, prior + align",
+    "launch": "c5pro_slam_reloc.launch",
+    "launchChain": [
+      "c5pro_slam_reloc.launch",
+      "c5pro_livox.launch",
+      "c5pro_mapping_reloc.launch"
+    ],
+    "configFiles": [
+      "initial_align.yaml",
+      "c5pro_fastlio_mid360s_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "initial_align",
+        "pkg": "fast_lio",
+        "type": "initial_align",
+        "source": "c5pro_slam_reloc.launch",
+        "optional": false
+      },
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5pro_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5pro_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5pro_mapping_reloc.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5pro_mapping_reloc.launch",
+        "optional": false
+      }
+    ],
+    "hardware": "MID360s",
+    "mode": "relocation",
+    "components": [
+      "Prior PCD",
+      "Initial Align",
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor"
+    ]
+  },
+  {
+    "name": "smoke-fov",
+    "description": "FOV crop visual smoke test",
+    "launch": "smoke_fov.launch",
+    "launchChain": [
+      "smoke_fov.launch",
+      "c5pro_slam.launch",
+      "c5pro_livox.launch",
+      "c5pro_mapping.launch"
+    ],
+    "configFiles": [
+      "overlay_fov.yaml",
+      "c5pro_fastlio_mid360s_config.yaml",
+      "anomaly_detection.yaml"
+    ],
+    "nodes": [
+      {
+        "name": "livox_lidar_publisher2",
+        "pkg": "livox_ros_driver2",
+        "type": "livox_ros_driver2_node",
+        "source": "c5pro_livox.launch",
+        "optional": false
+      },
+      {
+        "name": "record",
+        "pkg": "rosbag",
+        "type": "record",
+        "source": "c5pro_livox.launch",
+        "optional": true
+      },
+      {
+        "name": "laserMapping",
+        "pkg": "fast_lio",
+        "type": "fastlio_mapping",
+        "source": "c5pro_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "cpu_monitor",
+        "pkg": "fast_lio",
+        "type": "cpu_monitor",
+        "source": "c5pro_mapping.launch",
+        "optional": false
+      },
+      {
+        "name": "rviz",
+        "pkg": "rviz",
+        "type": "rviz",
+        "source": "c5pro_mapping.launch",
+        "optional": true
+      }
+    ],
+    "hardware": "MID360s",
+    "mode": "smoke",
+    "components": [
+      "Livox Driver",
+      "FAST_LIO",
+      "CPU Monitor",
+      "FOV Overlay"
+    ]
+  }
+]

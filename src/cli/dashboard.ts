@@ -3,8 +3,8 @@ import { runSSH, runSSHDetached, isUSBReachable } from "../core/ssh";
 import { REC_DEVICE_LOC_WS, ROS_DISTRO } from "../core/config";
 
 const LAUNCH_NAMES = {
-  slam: "fast_lio bringup_mid360s.launch",
-  reloc: "fast_lio bringup_mid360s_reloc.launch",
+  slam: "fast_lio c5pro_slam.launch",
+  reloc: "fast_lio c5pro_slam_reloc.launch",
   bridge: `src/mqtt_bridge.py`,
 };
 

@@ -4,7 +4,7 @@
 
 ```bash
 # 功能：在未知环境下的雷达定位和建图，将保存一个可以拿来定位的地图new.pcd
-roslaunch fast_lio mapping_mid360.launch
+roslaunch fast_lio c5v1_mapping.launch
 # 功能：给FY地面站发布实时扫到的点云
 roslaunch fast_lio fy_series_publisher.launch
 ```
@@ -28,7 +28,7 @@ wxx:
 # 功能：基于已知环境的点云地图（路径由 mid360.yaml 中 wxx/initial_map_pcd_name 配置）和当前雷达静止时获得的点云进行GICP匹配，获得雷达在已知地图上的初始位置
 roslaunch fast_lio initial_align.launch
 # 功能：在已知环境的点云地图（路径同上）下进行定位（和incremental建图）
-roslaunch fast_lio odom_mid360_with_map.launch
+roslaunch fast_lio c5v1_odom_with_map.launch
 # 如果需要向地面站传输点云，则可以加入这个
 roslaunch fast_lio fy_series_publisher.launch
 ```
@@ -47,7 +47,7 @@ roslaunch fast_lio fy_series_publisher.launch
 > 同时大家使用时候会需要调整的主要参数。举个例子如果算力吃紧（经常表现为ekf报红错误，可以检查算法输出odom的频率是否和雷达点云频率一致来确认），则可以将下述算力相关的参数按照意思调整，如将```point_filter_num```变大。如果有更细致的要求可以直接联系作者王学习
 
 
-## 1. **mapping_mid360.launch**
+## 1. **c5v1_mapping.launch**
 > 功能：
 在**未知环境**下的雷达定位和建图，将保存一个可以拿来定位的地图new.pcd
 
@@ -61,7 +61,7 @@ roslaunch fast_lio fy_series_publisher.launch
 
 ### 主要可调参数
 
-* 算力相关（mapping_mid360.launch里）
+* 算力相关（c5v1_mapping.launch里）
 ```xml
 <!-- 输入点云直接按照（计数%point_filter_num==0）降采样 -->
 <param name="point_filter_num" type="int" value="3"/>
@@ -138,7 +138,7 @@ zty:
 
 
 
-## 3. **odom_mid360_with_map.launch**
+## 3. **c5v1_odom_with_map.launch**
 > 功能：
 在**已知环境**的点云地图下进行定位（和incremental建图），地图文件路径由 `config/mid360.yaml` 中的 `wxx/initial_map_pcd_name` 决定（默认 `new1.pcd`）
 
@@ -156,7 +156,7 @@ zty:
 
 ### 主要可调参数
 
-* 上述**mapping_mid360.launch**的参数都在这里都有
+* 上述**c5v1_mapping.launch**的参数都在这里都有
 
 * 其他常用功能（mid360.yaml）
 ```xml

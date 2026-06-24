@@ -18,14 +18,16 @@ not available and tunnels via SSH.
 
 | Action            | Command (any host)                     | What it does                              |
 | ----------------- | -------------------------------------- | ----------------------------------------- |
-| **Start**         | `bun run prod start <recipe>`          | Clean → docker run → tmux 3-window        |
+| **Slam**          | `bun run prod slam [base]`            | Start slam, no map export                 |
+| **Slam + map**    | `bun run prod slam-map [base]`        | Start slam + incremental map export       |
+| **Reloc**         | `bun run prod reloc [base]`           | Start relocalization (prior map + align)  |
 | **Stop**          | `bun run prod stop`                   | Kill tmux + stop/remove containers        |
 | **Reset**         | `bun run prod reset`                  | stop + kill native roslaunch/livox/mqtt   |
 | **Attach**        | `bun run prod attach`                 | Connect to running tmux session           |
 | **Status**        | `bun run prod status`                 | Snapshot: tmux + docker + logs            |
 
-**Recipe names**: `mapping-mid360`, `mapping-mid360-prior`, `mapping-mid360-reloc`,
-`mapping-mid360s`, `mapping-mid360s-prior`, `mapping-mid360s-reloc`.
+**Base options**: `c5pro-mid360s` (c5pro + dual Mid360s), `c5v1-mid360` (c5v1 + single MID360).
+After `smoke data_link` passes, base is auto-detected from `/tmp/smoke-hardware`.
 
 See `src/core/config.ts` for definitions.
 
@@ -49,11 +51,7 @@ prod start  # no recipe → opens fzf menu
 | Action                  | Command                  | What it does                                    |
 | ----------------------- | ------------------------ | ----------------------------------------------- |
 | **Sync workspace**     | `bun run sync`           | rsync local workspace to device                  |
-| **Clean build**        | `bun run build`          | Remote catkin clean build                        |
-| **Incremental build**  | `bun run increment`      | rsync + remote incremental catkin build          |
-| **Full rebuild**       | `bun run full`           | rsync + remote clean catkin rebuild              |
-| **Docker image build**  | `bun run docker-dbuild`  | Build fastlio-jetson image with layered catkin_make |
-| **Docker image build** | `bun run docker-dbuild`  | Build `fastlio-jetson:latest` on device           |
+| **Docker image build** | `bun run docker-dbuild`  | Build fastlio-jetson image with layered catkin_make on device |
 
 ---
 
@@ -62,7 +60,8 @@ prod start  # no recipe → opens fzf menu
 | Action                   | Command                          | What it does                          |
 | ------------------------ | -------------------------------- | ------------------------------------- |
 | **Connectivity check**  | `bun run check`                  | SSH + remote toolchain verification    |
-| **Smoke test**          | `bun run smoke [--level slam]`   | FAST-LIO smoke test checklist          |
+| **Hardware test**       | `bun run smoke data_link`        | Hardware detection + frequency check (fzf) |
+| **FOV visual test**     | `bun run smoke fov`              | FOV crop visual comparison (RVIZ)     |
 
 
 ---
@@ -97,27 +96,43 @@ Log file properties:
 
 ---
 
+## 6. Documentation Web Views
+
+| View | Command | Source of truth |
+|------|---------|-----------------|
+| Codebase analysis | `bun run doc codebase` | Existing frontend analysis data |
+| All recipe pipelines | `bun run doc pipeline` | `RECIPES` + canonical `bringup/launch/` files |
+| One recipe pipeline | `bun run doc pipeline <recipe>` | Same, with the requested recipe selected |
+
+Pipeline documents are regenerated before the Web view starts. Their primary
+lanes are `devel.host`, `device.host`, and `device.container`; Bun, tmux,
+Docker, Livox, and FAST_LIO are components within those entities.
+
+---
+
 ## Quick Reference Card
 
 ```bash
 # === MOST COMMON ===
-bun run prod start mapping-mid360    # start + auto-attach
-bun run prod reset                   # clean everything
-bun run prod status                  # what's running?
+bun run smoke data_link          # select hardware → test
+bun run prod slam                # start slam (auto-detect hw)
+bun run prod reset               # clean everything
+bun run prod status              # what's running?
 
 # === TROUBLESHOOT ===
-ssh nv@192.168.55.1 'tail -f ~/Localization_ws/logs/fastlio-mapping-mid360.log'
-ssh nv@192.168.55.1 'docker logs --tail 200 fastlio-mapping-mid360'
-ssh nv@192.168.55.1 'docker exec fastlio-mapping-mid360 grep ERROR /root/.ros/log/latest/roslaunch-*.log'
+ssh nv@192.168.55.1 'tail -f ~/Localization_ws/logs/fastlio-c5pro-mid360s.log'
+ssh nv@192.168.55.1 'docker logs --tail 200 fastlio-c5pro-mid360s'
+ssh nv@192.168.55.1 'docker exec fastlio-c5pro-mid360s grep ERROR /root/.ros/log/latest/roslaunch-*.log'
 
 # === BUILD & DEPLOY ===
 bun run sync            # push code
-bun run build           # compile
+bun run docker-dbuild   # compile inside container
 bun run check           # verify
 
 # === PRODUCTION ===
-bun run prod stop       # stop session only
-bun run prod attach     # re-attach to tmux
-bun run prod start mapping-mid360-prior  # with prior map
-bun run prod start mapping-mid360-reloc  # with prior + alignment
+bun run prod slam               # auto-detected hardware
+bun run prod slam-map           # slam + map export
+bun run prod reloc              # relocalization
+bun run prod stop               # stop session only
+bun run prod attach             # re-attach to tmux
 ```

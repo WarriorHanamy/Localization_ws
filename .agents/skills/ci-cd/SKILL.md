@@ -14,7 +14,7 @@ Host (development)  ──USB──▶  Jetson (nv@192.168.55.1)
   rsync workspace                  tmux test/run
 ```
 
-- Zero Docker in this workspace
+- Docker-based build pipeline inside container
 - Code synced to Jetson via rsync, built and tested on-device over SSH
 - `uv` manages all CLI entry points (`bun run ...`)
 - All stages assume Jetson is online via USB RNDIS (`192.168.55.1`)
@@ -42,10 +42,7 @@ Available subcommands:
 | -------------------- | --------------------------------------------- |
 | `check`              | Verify SSH connectivity + remote toolchain    |
 | `sync`               | rsync workspace to Jetson (incremental)       |
-| `build`              | Remote catkin build (`rm -rf build devel`)    |
-| `increment`          | rsync + remote catkin build (no clean)        |
-| `full`               | rsync + remote clean catkin build             |
-| `docker-dbuild`      | Build fastlio-jetson image layer via Docker    |
+| `docker-dbuild`      | Build fastlio-jetson image with layered catkin_make on device |
 | `paths`              | Print local/remote workspace paths            |
 | `rviz`               | Launch RViz on Jetson display (via RustDesk)  |
 | `rviz livox`         | Launch RViz with raw LiDAR point cloud        |
@@ -55,9 +52,7 @@ Quick start:
 ```bash
 bun run check        # is Jetson reachable?
 bun run sync         # rsync source to Jetson
-bun run build        # clean build on Jetson
-bun run increment    # quick: rsync + incremental build
-bun run docker-dbuild       # layer rebuild via Docker
+bun run docker-dbuild       # Docker image build (catkin_make inside container)
 ```
 
 ---
@@ -83,7 +78,7 @@ bun run docker-dbuild
 
 ```bash
 bun run sync
-bun run build
+bun run docker-dbuild
 # Then SSH in and launch prod tmux:
 ssh nv@192.168.55.1 \
   'source /opt/ros/noetic/setup.bash && cd ~/Localization_ws && source devel/setup.bash && roslaunch ...'
@@ -96,9 +91,9 @@ ssh nv@192.168.55.1 \
 
 ```bash
 bun run sync
-bun run build
+bun run docker-dbuild
 ssh nv@192.168.55.1
-# Inside Jetson:
+# Inside Jetson (or docker exec into container):
 cd ~/Localization_ws
 source devel/setup.bash
 tmux new -s bringup-debug
@@ -392,7 +387,7 @@ roscore &
 sleep 3
 
 # 2. 后续所有 roslaunch 都会复用已存在的 roscore
-roslaunch bringup msg_MID360s.launch &
+roslaunch bringup c5pro_livox.launch &
 
 # 3. 多 pane 启动错开时间（6s 间隔）
 tmux send-keys -t "${SESSION}:win" 'bash pane0_launch.sh' C-m   # t=0

@@ -28,19 +28,15 @@ function dockerSpawn(args: string[]): { exitCode: number; stdout: string; stderr
 }
 
 function recipeLaunch(name: string): { launch: string; fullName: string } | null {
-  // Exact match
   const exact = RECIPES[name as RecipeName];
   if (exact) return { launch: exact.launch, fullName: name };
-  // Try mapping- prefix (e.g. "mid360" → "mapping-mid360")
-  const prefixed = `mapping-${name}`;
-  const p = RECIPES[prefixed as RecipeName];
-  if (p) return { launch: p.launch, fullName: prefixed };
   return null;
 }
 
 function fzfPick(options: string[]): string | null {
   const input = options.sort().join("\n");
-  const proc = Bun.spawnSync(["bash", "-c", `echo "$1" | fzf --height=20% --header=Select a recipe`, "_", input], {
+  const proc = Bun.spawnSync(["bash", "-c", `echo "$1" | fzf --height=20% --header="Select hardware"`, "_", input], {
+    stdin: "inherit",
     stdout: "pipe",
     stderr: "inherit",
   });
@@ -86,18 +82,19 @@ function printResults(results: SmokeResult[]): void {
   }
 }
 
-async function doSmokeDataLink(recipeArg: string): Promise<void> {
-  // Resolve short name or prompt via fzf
+const HW_OPTIONS = ["c5pro-mid360s", "c5v1-mid360"];
+
+async function doSmokeDataLink(recipeArg?: string): Promise<void> {
   let resolved: { launch: string; fullName: string } | null = null;
   if (recipeArg) {
     resolved = recipeLaunch(recipeArg);
   } else if (process.stdin.isTTY) {
-    const pick = fzfPick(Object.keys(RECIPES));
+    const pick = fzfPick(HW_OPTIONS);
     if (pick) resolved = recipeLaunch(pick);
   }
   if (!resolved) {
     console.error(`[smoke] Unknown recipe: ${recipeArg || "(none)"}`);
-    console.error(`  Known: ${Object.keys(RECIPES).sort().join(" ")}`);
+    console.error(`  Options: ${HW_OPTIONS.join(", ")}`);
     process.exit(1);
   }
 
@@ -145,7 +142,7 @@ async function doSmokeDataLink(recipeArg: string): Promise<void> {
   // Run container-smoke.sh inside Docker (script has its own startup timeout)
   console.log(`[smoke] Running container-smoke.sh inside '${containerName}' ...`);
   const script = "/catkin_ws/src/bringup/scripts/container-smoke.sh";
-  const mode = launch.includes("bringup_") ? "mapping" : "driver";
+  const mode = "mapping";
   const exec = dockerSpawn([
     "docker", "exec", containerName,
     "bash", script, mode,
@@ -191,15 +188,19 @@ function readHardwareState(): string | null {
 
 async function doSmokeFov(recipeArg?: string): Promise<void> {
   const stateHw = readHardwareState();
-  const resolved = recipeLaunch(recipeArg || stateHw || "mid360s");
+  const base = recipeArg || stateHw;
+  if (!base) {
+    console.error("[smoke] No recipe specified and no hardware state found.");
+    console.error("[smoke] Run 'smoke data_link' first to establish hardware state.");
+    process.exit(1);
+  }
+  const resolved = recipeLaunch(base);
   if (!resolved) {
-    console.error(`[smoke] Unknown recipe: ${recipeArg || "(none)"}`);
+    console.error(`[smoke] Unknown recipe: ${base}`);
     process.exit(1);
   }
   const { fullName } = resolved;
-  // Recipe state may contain a mapping variant, but smoke_fov.launch accepts
-  // only the physical hardware suffix.
-  const hardware = fullName.includes("mid360s") ? "mid360s" : "mid360";
+  const hardware = fullName.split("-")[0];
 
   const SESSION = "smoke-fov";
   const containerName = "fastlio-smoke-fov";
@@ -211,7 +212,7 @@ async function doSmokeFov(recipeArg?: string): Promise<void> {
     const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
     const remoteCmd =
       `cd ${$.escape(REC_DEVICE_LOC_WS)} && ` +
-      `REC_DEVICE_LOC_WS=${$.escape(REC_DEVICE_LOC_WS)} bun run smoke fov ${$.escape(hardware)}`;
+      `REC_DEVICE_LOC_WS=${$.escape(REC_DEVICE_LOC_WS)} bun run smoke fov ${$.escape(fullName)}`;
     const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
       stdio: ["inherit", "inherit", "inherit"],
     });
@@ -302,7 +303,7 @@ export async function cmdSmoke(args: string[]): Promise<void> {
   }
 
   console.log("[smoke] smoke test commands:");
+  console.log("  bun run smoke data_link              hardware detection + frequency check (fzf)");
   console.log("  bun run smoke fov                     FOV crop visual check (RVIZ + NoMachine)");
-  console.log("  bun run smoke data_link <recipe>      data-link frequency check (headless)");
-  console.log(`  Recipes: ${Object.keys(RECIPES).sort().join(" ")}`);
+  console.log(`  HW options: ${HW_OPTIONS.join(", ")}`);
 }

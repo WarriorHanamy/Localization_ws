@@ -27,22 +27,21 @@ Recipe definitions live in `src/core/config.ts` (single source of truth).
 **Usage (on device):**
 
 ```bash
-bun run prod start mapping-mid360   # start + auto-attach (most common)
-prod start mapping-mid360           # same, with bin/ in PATH
-prod start <TAB>                    # TAB completion for recipes
-prod start                          # TTY → fzf interactive recipe picker
-bun run prod stop                   # stop session + containers
-bun run prod reset                  # full reset (stop + kill all processes)
-bun run prod attach                 # attach to tmux session
-bun run prod status                 # show status
+bun run prod slam               # auto-detect hardware, start slam
+bun run prod slam-map           # slam + map export
+bun run prod reloc              # relocalization
+bun run prod stop               # stop session + containers
+bun run prod reset              # full reset
+bun run prod attach             # attach to tmux session
+bun run prod status             # show status
 ```
 
 **Usage (from devel-host) — same commands, auto-bridge:**
 
 ```bash
-bun run prod start mapping-mid360   # auto-SSH to device, no manual wrapping
-bun run prod reset                  # works identically
-bun run prod status                 # works identically
+bun run prod slam               # auto-SSH to device, no manual wrapping
+bun run prod reset              # works identically
+bun run prod status             # works identically
 ```
 
 #### Conventions

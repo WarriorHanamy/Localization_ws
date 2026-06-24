@@ -7,7 +7,10 @@ import { cmdSmoke } from "./smoke";
 import { cmdDockerBuild } from "./docker-build";
 import { cmdDockerStart } from "./docker-start";
 import { cmdDockerShell } from "./docker-shell";
+import { cmdDockerPush } from "./docker-push";
+import { cmdRegistry } from "./registry";
 import { cmdProd } from "./prod";
+import { cmdDoc } from "./doc";
 import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
@@ -26,11 +29,19 @@ Commands:
   smoke fov                     FOV crop visual smoke test (RVIZ + NoMachine)
   smoke data_link [recipe]       data-link frequency check (headless, fzf picker)
   smoke                          show smoke test help
+  doc codebase                   open code analysis documentation
+  doc pipeline [recipe]          open entity-centric recipe pipelines
 
 Docker commands:
   docker-dbuild      build fastlio-jetson image on Jetson (SSH)
+  docker-push        push image to local registry (from golden Jetson)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
+
+Registry:
+  registry start     start registry:2 + pull tracker proxy
+  registry stop      stop registry + tracker
+  registry status    show registry/tracker status
 
 Production (tmux + docker):
   prod start --recipe <name>  start production pipeline
@@ -110,8 +121,17 @@ async function main() {
     case "docker-shell":
       await cmdDockerShell(args);
       break;
+    case "docker-push":
+      await cmdDockerPush();
+      break;
+    case "registry":
+      await cmdRegistry(args);
+      break;
     case "prod":
       await cmdProd(args);
+      break;
+    case "doc":
+      await cmdDoc(args);
       break;
     case "help":
     case "--help":

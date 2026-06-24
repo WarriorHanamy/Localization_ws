@@ -39,9 +39,9 @@ when invoked from the devel host.
 ### One Script to Start All Services (reset first)
 
 ```bash
-bun run prod start mapping-mid360
+bun run prod slam
 # or simply (with bin/ in PATH):
-prod start mapping-mid360
+prod slam
 ```
 
 Always starts from a clean state:
@@ -106,25 +106,25 @@ These log files are the primary, reliable observation interface for the agent.
 ssh nv@192.168.55.1 'cd ~/Localization_ws && bun run prod status'
 
 # Read slam log
-ssh nv@192.168.55.1 'cat ~/Localization_ws/logs/fastlio-mapping-mid360.log'
+ssh nv@192.168.55.1 'cat ~/Localization_ws/logs/fastlio-c5pro-mid360s.log'
 
 # Follow slam log
-ssh nv@192.168.55.1 'tail -f ~/Localization_ws/logs/fastlio-mapping-mid360.log'
+ssh nv@192.168.55.1 'tail -f ~/Localization_ws/logs/fastlio-c5pro-mid360s.log'
 
 # Follow slam log in real time (most common)
-ssh nv@192.168.55.1 'tail -f ~/Localization_ws/logs/fastlio-mapping-mid360.log'
+ssh nv@192.168.55.1 'tail -f ~/Localization_ws/logs/fastlio-c5pro-mid360s.log'
 
 # Search logs for errors or key words
-ssh nv@192.168.55.1 'grep -i error ~/Localization_ws/logs/fastlio-mapping-mid360.log'
+ssh nv@192.168.55.1 'grep -i error ~/Localization_ws/logs/fastlio-c5pro-mid360s.log'
 
 # Read topics log
-ssh nv@192.168.55.1 'cat ~/Localization_ws/logs/fastlio-mapping-mid360.topics.log'
+ssh nv@192.168.55.1 'cat ~/Localization_ws/logs/fastlio-c5pro-mid360s.topics.log'
 
 # Container-native logs (supplemental)
-ssh nv@192.168.55.1 'docker logs --tail 200 fastlio-mapping-mid360'
+ssh nv@192.168.55.1 'docker logs --tail 200 fastlio-c5pro-mid360s'
 
 # ROS error trace from inside the container
-ssh nv@192.168.55.1 'docker exec fastlio-mapping-mid360 grep ERROR /root/.ros/log/latest/roslaunch-*.log'
+ssh nv@192.168.55.1 'docker exec fastlio-c5pro-mid360s grep ERROR /root/.ros/log/latest/roslaunch-*.log'
 ```
 
 ### Agent Triggering Production
@@ -134,7 +134,7 @@ bridges via SSH. No manual SSH wrapping required:
 
 ```bash
 # These work on BOTH hosts:
-bun run prod start mapping-mid360
+bun run prod slam
 bun run prod stop
 bun run prod reset
 bun run prod attach

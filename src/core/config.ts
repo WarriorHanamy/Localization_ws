@@ -20,6 +20,17 @@ export const WORKSPACE_PKGS = [
   "bringup",
 ] as const;
 
+// Registry and fleet distribution
+export const REGISTRY_PORT = 5000;          // Public proxy port (pull through tracker)
+export const REGISTRY_DIRECT_PORT = 5050;   // Direct registry port (push from golden Jetson)
+export const REGISTRY_INTERNAL_PORT = REGISTRY_DIRECT_PORT; // Tracker upstream port
+export const DOCKER_REGISTRY_IMAGE = "registry:2";
+export const TRACKER_LOG = "logs/registry-pulls.json";
+export const MAX_TRACKER_ENTRIES = 1000;
+
+const configuredLANHost = Bun.env.LOCALIZATION_LAN_HOST?.trim();
+export const LAN_HOST = configuredLANHost || "";
+
 export const RUSTDESK_ID = "466016959";
 export const RUSTDESK_PASS_ENV = "RUSTDESK_PASS";
 
@@ -48,20 +59,22 @@ export const RSYNC_EXCLUDES = [
   "node_modules/",
   "frontend/dist/",
   "bun.lock",
+  "bringup/resource/",
 ] as const;
 
 export const DOCKER_IMAGE = "fastlio-jetson:latest";
 
 export const RECIPES = {
-  "mid360":                 { launch: "bringup_mid360.launch",       desc: "single MID360 (hardware base)" },
-  "mid360s":                { launch: "bringup_mid360s.launch",      desc: "dual MID360s (hardware base)"  },
-  "mapping-mid360":         { launch: "bringup_mid360.launch",       desc: "mid360 + mapping, no prior" },
-  "mapping-mid360-prior":   { launch: "bringup_mid360_prior.launch", desc: "mid360 + mapping, prior map" },
-  "mapping-mid360-reloc":   { launch: "bringup_mid360_reloc.launch", desc: "mid360 + mapping, prior + align" },
-  "mapping-mid360s":         { launch: "bringup_mid360s.launch",       desc: "mid360s + mapping, no prior" },
-  "mapping-mid360s-prior":   { launch: "bringup_mid360s_prior.launch", desc: "mid360s + mapping, prior map" },
-  "mapping-mid360s-reloc":   { launch: "bringup_mid360s_reloc.launch", desc: "mid360s + mapping, prior + align" },
-  "smoke-fov":                { launch: "smoke_fov.launch",             desc: "FOV crop visual smoke test" },
+  // c5pro + dual Mid360s (Mid360s)
+  "c5pro-mid360s":        { launch: "c5pro_slam.launch",       desc: "c5pro + 双 Mid360s slam" },
+  "c5pro-mid360s-map":    { launch: "c5pro_slam_map.launch",   desc: "c5pro + 双 Mid360s slam + 导出图" },
+  "c5pro-mid360s-reloc":  { launch: "c5pro_slam_reloc.launch", desc: "c5pro + 双 Mid360s 重定位" },
+  // c5v1 + single MID360
+  "c5v1-mid360":          { launch: "c5v1_slam.launch",        desc: "c5v1 + 单 MID360 slam" },
+  "c5v1-mid360-map":      { launch: "c5v1_slam_map.launch",    desc: "c5v1 + 单 MID360 slam + 导出图" },
+  "c5v1-mid360-reloc":    { launch: "c5v1_slam_reloc.launch",  desc: "c5v1 + 单 MID360 重定位" },
+  // smoke
+  "smoke-fov":            { launch: "smoke_fov.launch",        desc: "FOV 裁剪可视化测试" },
 } as const;
 
 export type RecipeName = keyof typeof RECIPES;

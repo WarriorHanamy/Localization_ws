@@ -117,7 +117,7 @@ Launch files of ROS are in the "ws_livox/src/livox_ros_driver2/launch_ROS1" dire
 | rviz_HAP.launch   | Connect to HAP LiDAR device<br>Publish pointcloud2 format  data<br>Autoload rviz |
 | msg_HAP.launch     | Connect to HAP LiDAR device<br>Publish livox customized pointcloud data|
 | rviz_MID360.launch        | Connect to MID360 LiDAR device<br>Publish pointcloud2 format data <br>Autoload rviz|
-| msg_MID360.launch          | Connect to MID360 LiDAR device<br>Publish livox customized pointcloud data |
+| c5v1_livox.launch          | Connect to MID360 LiDAR device<br>Publish livox customized pointcloud data |
 | rviz_mixed.launch    | Connect to HAP and MID360 LiDAR device<br>Publish pointcloud2 format data <br>Autoload rviz|
 | msg_mixed.launch      | Connect to HAP and MID360 LiDAR device<br>Publish livox customized pointcloud data |
 

@@ -162,7 +162,7 @@ ssh nv@192.168.55.1 "bash -lc 'source ~/.profile && uv --version'"
 ### 1.2. Configure LiDAR wired interface (eth0)
 
 The MID360 LiDAR connects via Ethernet and requires a static IP on the `192.168.2.0/24`
-subnet (as configured in `src/bringup/config/mid360.json`).
+subnet (as configured in `src/bringup/config/c5v1_livox_mid360_config.json`).
 
 ```bash
 ssh nv@192.168.55.1 "sudo nmcli connection add \

@@ -75,6 +75,16 @@ export function NavBar({ view }: NavBarProps) {
       >
         Compare
       </a>
+      <a
+        href="#pipeline"
+        style={{
+          color: view === "pipeline" ? "#88ccff" : "#667",
+          textDecoration: "none",
+          fontWeight: view === "pipeline" ? 600 : 400,
+        }}
+      >
+        Pipeline Docs
+      </a>
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
         {view === "dashboard" && ws === "connected" && <RecordingButton />}
