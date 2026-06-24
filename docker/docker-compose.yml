@@ -55,6 +55,6 @@ services:
     container_name: fastlio-l2-calib
     environment:
       - DISPLAY=${DISPLAY:-:0}
-    command: roslaunch bringup smoke_l2_calib.launch hardware:=${HARDWARE:-c5v1}
+    command: roslaunch bringup smoke_l2_calib_bag.launch
     stdin_open: true
     tty: true

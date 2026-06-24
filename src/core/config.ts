@@ -52,8 +52,7 @@ export const RSYNC_EXCLUDES = [
   "install/",
   "logs/",
   "PCD/",
-  "bag/",
-  "*.bag",
+  "bag/*.bag",
   ".vscode/",
   ".DS_Store",
   "node_modules/",
@@ -88,7 +87,8 @@ export const RECIPES = {
   "l2-slam-mavros":     { launch: "smoke_l2_slam.launch",   imu_src: "mavros", desc: "L2 SLAM / MAVROS" },
   "l2-fov-livox":       { launch: "smoke_l2_fov.launch",    imu_src: "livox",  desc: "L2 FOV 裁剪 / Livox" },
   "l2-fov-mavros":      { launch: "smoke_l2_fov.launch",    imu_src: "mavros", desc: "L2 FOV 裁剪 / MAVROS" },
-  "l2-calib":           { launch: "smoke_l2_calib.launch",  imu_src: "mavros", desc: "L2 标定 (LI-Init)" },
+  "l2-calib":           { launch: "smoke_l2_calib_bag.launch",  imu_src: "mavros", desc: "L2 标定 (bag + LI-Init)" },
+  "l2-eval":            { launch: "smoke_l2_eval.launch",   imu_src: "mavros", desc: "L2 评估 (ground plane)" },
 } as const;
 
 export type RecipeName = keyof typeof RECIPES;

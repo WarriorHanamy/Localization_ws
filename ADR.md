@@ -254,7 +254,7 @@ smoke_l1.launch          (LiDAR driver + MAVROS, no consumers)
        │
        ├──→ smoke_l2_slam.launch   (L1 + FAST_LIO)
        ├──→ smoke_l2_fov.launch    (L1 + FAST_LIO + FOV crop)
-       └──→ smoke_l2_calib.launch  (L1 + LI-Init)
+        └──→ smoke_l2_calib_bag.launch  (bag + LI-Init)
 ```
 
 | Level | Command                          | Image              | Scope                |

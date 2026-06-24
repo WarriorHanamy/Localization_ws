@@ -29,7 +29,8 @@ Commands:
   smoke l1-{livox|mavros} <hw>  L1 driver frequency check (headless)
   smoke l2-slam-{livox|mavros} <hw> L2 SLAM pipeline + RVIZ
   smoke l2-fov-{livox|mavros} <hw>  L2 SLAM + FOV crop + RVIZ
-  smoke l2-calib <hw>          L2 calibration + RVIZ (always mavros)
+  smoke l2-calib <hw>          L2 calibration (bag + LI-Init, headless)
+  smoke l2-eval                L2 evaluation (static bag, ground plane)
   smoke                          show smoke test help
   doc codebase                   open code analysis documentation
   doc pipeline [recipe]          open entity-centric recipe pipelines

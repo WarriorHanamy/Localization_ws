@@ -12,8 +12,8 @@ initialization:
     cut_frame_num: 5             # smoke: 5 frames for quick calibration
     orig_odom_freq: 10
     mean_acc_norm: 9.805         # Pixhawk IMU
-    online_refine_time: 10       # shortened for smoke test
-    data_accum_length: 500
+    online_refine_time: 20       # shortened for smoke test
+    data_accum_length: 200
     Rot_LI_cov: [ 0.00005, 0.00005, 0.00005 ]
     Trans_LI_cov: [ 0.00001, 0.00001, 0.00001 ]
 

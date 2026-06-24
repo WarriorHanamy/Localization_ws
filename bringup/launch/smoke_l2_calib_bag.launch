@@ -1,0 +1,19 @@
+<launch>
+  <arg name="bag_file" default="$(find bringup)/bags/calib_c5_2026-06-24-12-18-08.bag"/>
+  <arg name="bag_rate" default="1.0"/>
+
+  <!-- Play bag: /livox/lidar + /mavros/imu/data → LI-Init subscribes -->
+  <node pkg="rosbag" type="play" name="rosbag_play"
+        args="--clock --wait-for-subscribers --loop --rate=$(arg bag_rate) $(arg bag_file)"
+        output="screen"/>
+
+  <!-- LI-Init calibration node -->
+  <rosparam command="load"
+    file="$(find bringup)/config/smoke_l2_calib_bag.yaml"/>
+
+  <node pkg="lidar_imu_init" type="li_init" name="laserMapping" output="screen"/>
+
+  <param name="point_filter_num" type="int" value="2"/>
+  <param name="max_iteration" type="int" value="5"/>
+  <param name="cube_side_length" type="double" value="2000"/>
+</launch>
