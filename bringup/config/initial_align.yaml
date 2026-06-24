@@ -1,13 +1,12 @@
-wxx:
-  initial_align:
-    voxelgrid_filter_size:  0.2
-    max_iteration:          5
-    icp_mode:               4   # 4 is best
-    initial_map_size:       50 #30
+initial_align:
+  voxelgrid_filter_size:  0.2
+  max_iteration:          5
+  icp_mode:               4   # 4 is best
+  initial_map_size:       50 #30
 
-    Init_Body_pos_x: -100.0
-    Init_Body_pos_y: -0.0
-    Init_Body_pos_z: 0.0
+  Init_Body_pos_x: -100.0
+  Init_Body_pos_y: -0.0
+  Init_Body_pos_z: 0.0
 
 zty:
   advanced_by_scan_context: false

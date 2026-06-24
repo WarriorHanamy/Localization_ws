@@ -1,0 +1,5 @@
+<launch>
+  <arg name="hardware" default="mid360s" doc="mid360 or mid360s"/>
+  <include file="$(find bringup)/launch/bringup_$(arg hardware).launch"/>
+  <rosparam command="load" file="$(find bringup)/config/overlay_fov.yaml"/>
+</launch>

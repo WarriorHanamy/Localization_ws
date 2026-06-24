@@ -453,14 +453,14 @@ int main(int argc, char** argv)
     nh.param<bool>("feature_extract_enable", p_pre_->feature_enabled, false);
     cout<<"p_pre_->lidar_type "<<p_pre_->lidar_type<<endl;
 
-    nh.param<double>("wxx/initial_align/Init_Body_pos_x", Init_Body_pos_[0], 0.0);
-    nh.param<double>("wxx/initial_align/Init_Body_pos_y", Init_Body_pos_[1], 0.0);
-    nh.param<double>("wxx/initial_align/Init_Body_pos_z", Init_Body_pos_[2], 0.0);
-    nh.param<string>("wxx/initial_map_pcd_name", initial_map_pcd_name_, "initial_map.pcd");
+    nh.param<double>("initial_align/Init_Body_pos_x", Init_Body_pos_[0], 0.0);
+    nh.param<double>("initial_align/Init_Body_pos_y", Init_Body_pos_[1], 0.0);
+    nh.param<double>("initial_align/Init_Body_pos_z", Init_Body_pos_[2], 0.0);
+    nh.param<string>("map/pcd_file", initial_map_pcd_name_, "initial_map.pcd");
     vector<double> Lidar_wrt_Body_T_vec(3, 0.0);
     vector<double> Lidar_wrt_Body_R_vec(9, 0.0);
-    nh.param<vector<double>>("wxx/Lidar_wrt_Body_T", Lidar_wrt_Body_T_vec, vector<double>());
-    nh.param<vector<double>>("wxx/Lidar_wrt_Body_R", Lidar_wrt_Body_R_vec, vector<double>());
+    nh.param<vector<double>>("lidar_body/translation", Lidar_wrt_Body_T_vec, vector<double>());
+    nh.param<vector<double>>("lidar_body/rotation", Lidar_wrt_Body_R_vec, vector<double>());
     Lidar_wrt_Body_T << Lidar_wrt_Body_T_vec[0], Lidar_wrt_Body_T_vec[1], Lidar_wrt_Body_T_vec[2];
     Lidar_wrt_Body_R << Lidar_wrt_Body_R_vec[0], Lidar_wrt_Body_R_vec[1], Lidar_wrt_Body_R_vec[2],
                         Lidar_wrt_Body_R_vec[3], Lidar_wrt_Body_R_vec[4], Lidar_wrt_Body_R_vec[5],
@@ -476,11 +476,11 @@ int main(int argc, char** argv)
     std::cout << "Lidar_wrt_Body_R_vec[8] : " << Lidar_wrt_Body_R_vec[8] << std::endl;
     p_pre_->Lidar_wrt_Body_RT(Lidar_wrt_Body_T, Lidar_wrt_Body_R);
 
-    nh.param<double>("wxx/initial_align/voxelgrid_filter_size", param_voxelgrid_filter_size_, 0.5);
-    nh.param<int>("wxx/initial_align/max_iteration", param_max_iterations_, 4);
-    nh.param<int>("wxx/initial_align/icp_mode", param_function_value_, 1);
-    nh.param<double>("wxx/initial_align/initial_map_size", param_map_size_, 50);
-    nh.param<int>("wxx/initial_align/param_accumulated_scan", param_accumulated_scan_, 10);
+    nh.param<double>("initial_align/voxelgrid_filter_size", param_voxelgrid_filter_size_, 0.5);
+    nh.param<int>("initial_align/max_iteration", param_max_iterations_, 4);
+    nh.param<int>("initial_align/icp_mode", param_function_value_, 1);
+    nh.param<double>("initial_align/initial_map_size", param_map_size_, 50);
+    nh.param<int>("initial_align/param_accumulated_scan", param_accumulated_scan_, 10);
 
     nh.param<bool>("zty/advanced_by_scan_context", advanced_by_sc_, true);
     nh.param<int>("zty/scancontext/test_PC_NUM_RING", test_PC_NUM_RING, 20);

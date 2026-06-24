@@ -1158,22 +1158,22 @@ int main(int argc, char** argv)
     nh.param<int>("pcd_save/interval", pcd_save_interval, -1);
     nh.param<vector<double>>("mapping/extrinsic_T", extrinT, vector<double>());
     nh.param<vector<double>>("mapping/extrinsic_R", extrinR, vector<double>());
-    nh.param<vector<double>>("wxx/Lidar_wrt_Body_T", Lidar_wrt_Body_T_vec, vector<double>());
-    nh.param<vector<double>>("wxx/Lidar_wrt_Body_R", Lidar_wrt_Body_R_vec, vector<double>());
+    nh.param<vector<double>>("lidar_body/translation", Lidar_wrt_Body_T_vec, vector<double>());
+    nh.param<vector<double>>("lidar_body/rotation", Lidar_wrt_Body_R_vec, vector<double>());
     cout<<"p_pre->lidar_type "<<p_pre->lidar_type<<endl;
     
     // [wxx] map
-    nh.param<bool>("wxx/map_incremental", map_incremental_, true);
-    nh.param<bool>("wxx/initial_map_from_pcd", initial_map_from_pcd_, true);
-    nh.param<string>("wxx/initial_map_pcd_name", initial_map_pcd_name_, "initial_map.pcd");
-    nh.param<bool>  ("prior_local_enable",        prior_local_enable_,        false);
-    nh.param<double>("prior_local_radius",        prior_local_radius_,        5.0);
-    nh.param<bool>  ("prior_local_motion_check",  prior_local_motion_check_,  false);
-    nh.param<double>("prior_local_motion_thresh", prior_local_motion_thresh_, 0.5);
-    nh.param<double>("prior_local_leaf",              prior_local_leaf_,          0.1);
-    nh.param<double>("prior_local_gen_hz",            prior_local_gen_hz_,        2.0);
-    nh.param<bool>("wxx/save_new_map_to_pcd", save_new_map_to_pcd_, true);
-    nh.param<string>("wxx/new_map_pcd_name", new_map_pcd_name_, "new_map.pcd");
+    nh.param<bool>("map/incremental", map_incremental_, true);
+    nh.param<bool>("map/load_from_pcd", initial_map_from_pcd_, true);
+    nh.param<string>("map/pcd_file", initial_map_pcd_name_, "initial_map.pcd");
+    nh.param<bool>  ("prior_local/enable",        prior_local_enable_,        false);
+    nh.param<double>("prior_local/radius",        prior_local_radius_,        5.0);
+    nh.param<bool>  ("prior_local/motion_check",  prior_local_motion_check_,  false);
+    nh.param<double>("prior_local/motion_threshold", prior_local_motion_thresh_, 0.5);
+    nh.param<double>("prior_local/leaf_size",              prior_local_leaf_,          0.1);
+    nh.param<double>("prior_local/generation_hz",            prior_local_gen_hz_,        2.0);
+    nh.param<bool>("map/save_on_exit", save_new_map_to_pcd_, true);
+    nh.param<string>("map/save_file", new_map_pcd_name_, "new_map.pcd");
     if( (!map_incremental_) && (!initial_map_from_pcd_) )
     {
         std::cout << "\033[1;33m[wxx] FAST_LIO can't work without without either an initial map or incremental mapping." << "\033[0m" << std::endl;
@@ -1187,9 +1187,9 @@ int main(int argc, char** argv)
     // std::cout << "\033[1;32m[wxx] Init_IMU_pos: " << Init_IMU_pos_.transpose() << "\033[0m" << std::endl;
 
     // [wxx] sched_setaffinity
-    nh.param<bool>("wxx/sched_setaffinity_en", sched_setaffinity_en_, false);
-    nh.param<int>("wxx/cpu_core_num", cpu_core_num_, 8);
-    nh.param<vector<int>>("wxx/sched_setaffinity_cores", sched_setaffinity_cores_, vector<int>());
+    nh.param<bool>("sched/affinity_enable", sched_setaffinity_en_, false);
+    nh.param<int>("sched/core_count", cpu_core_num_, 8);
+    nh.param<vector<int>>("sched/affinity_cores", sched_setaffinity_cores_, vector<int>());
     if( sched_setaffinity_en_ )
     {
         if( sched_setaffinity_cores_.size() != 3 )
@@ -1208,11 +1208,11 @@ int main(int argc, char** argv)
     }
 
     // [wxx] anomaly_detection
-    nh.param<double>("wxx/anomaly_detection/timeout_imu", ad_param_.timeout_imu, 0.1);
-    nh.param<double>("wxx/anomaly_detection/timeout_lidar", ad_param_.timeout_lidar, 0.2);
-    nh.param<double>("wxx/anomaly_detection/imu_freq", ad_param_.imu_freq, 200);
-    nh.param<double>("wxx/anomaly_detection/lidar_freq", ad_param_.lidar_freq, 10);
-    nh.param<double>("wxx/anomaly_detection/hardware_recover_duration", ad_param_.hardware_recover_duration, 1.0);
+    nh.param<double>("anomaly_detection/timeout_imu", ad_param_.timeout_imu, 0.1);
+    nh.param<double>("anomaly_detection/timeout_lidar", ad_param_.timeout_lidar, 0.2);
+    nh.param<double>("anomaly_detection/imu_freq", ad_param_.imu_freq, 200);
+    nh.param<double>("anomaly_detection/lidar_freq", ad_param_.lidar_freq, 10);
+    nh.param<double>("anomaly_detection/hardware_recover_duration", ad_param_.hardware_recover_duration, 1.0);
 
     path.header.stamp    = ros::Time::now();
     path.header.frame_id ="world";

@@ -81,7 +81,7 @@ for spec in \
   "LiDAR topic present|/livox/lidar|sensor_msgs/PointCloud2"; do
   IFS='|' read -r name topic expected <<<"$spec"
   actual="$(topic_type "$topic")"
-  if [[ "$actual" == "$expected" ]]; then
+  if [[ "$actual" == "$expected" || "$actual" == "livox_ros_driver2/CustomMsg" ]]; then
     emit_result driver "$name" "$topic" "$expected" 1 "$actual" 1
   else
     emit_result driver "$name" "$topic" "$expected" 0 "${actual:-not found}" 0

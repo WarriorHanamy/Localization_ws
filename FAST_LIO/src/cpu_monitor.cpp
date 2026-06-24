@@ -39,11 +39,11 @@ int main(int argc, char** argv)
 
 
     // [wxx] cpu_monitor
-    nh.param<bool>("wxx/cpu_monitor_en", cpu_monitor_en_, false);
-    nh.param<int>("wxx/cpu_monitor_filter_type", cpu_monitor_filter_type_, 0);
-    nh.param<double>("wxx/cpu_monitor_filter_filter_param1", cpu_monitor_filter_filter_param1_, 0.0);
-    nh.param<double>("wxx/cpu_monitor_filter_filter_param2", cpu_monitor_filter_filter_param2_, 0.0);
-    nh.param<double>("wxx/cpu_monitor_freq", cpu_monitor_freq_, 10.0);
+    nh.param<bool>("cpu_monitor/enable", cpu_monitor_en_, false);
+    nh.param<int>("cpu_monitor/filter_type", cpu_monitor_filter_type_, 0);
+    nh.param<double>("cpu_monitor/filter_param1", cpu_monitor_filter_filter_param1_, 0.0);
+    nh.param<double>("cpu_monitor/filter_param2", cpu_monitor_filter_filter_param2_, 0.0);
+    nh.param<double>("cpu_monitor/freq", cpu_monitor_freq_, 10.0);
 
     ros::Timer cpu_usage_timer;
     if( cpu_monitor_en_ )

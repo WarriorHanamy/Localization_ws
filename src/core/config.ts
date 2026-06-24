@@ -47,13 +47,15 @@ export const RSYNC_EXCLUDES = [
 export const DOCKER_IMAGE = "fastlio-jetson:latest";
 
 export const RECIPES = {
-  "mapping-mid360":       { launch: "bringup_mid360.launch",       desc: "mid360 + mapping, no prior" },
-  "mapping-mid360-prior": { launch: "bringup_mid360_prior.launch", desc: "mid360 + mapping, prior map" },
-  "mapping-mid360-reloc": { launch: "bringup_mid360_reloc.launch", desc: "mid360 + mapping, prior + align" },
-  "mapping-mid360s":       { launch: "bringup_mid360s.launch",       desc: "mid360s + mapping, no prior" },
-  "mapping-mid360s-prior": { launch: "bringup_mid360s_prior.launch", desc: "mid360s + mapping, prior map" },
-  "mapping-mid360s-reloc": { launch: "bringup_mid360s_reloc.launch", desc: "mid360s + mapping, prior + align" },
-  "smoke-fov":              { launch: "smoke_fov_test.launch",       desc: "FOV crop visual smoke test" },
+  "mid360":                 { launch: "bringup_mid360.launch",       desc: "single MID360 (hardware base)" },
+  "mid360s":                { launch: "bringup_mid360s.launch",      desc: "dual MID360s (hardware base)"  },
+  "mapping-mid360":         { launch: "bringup_mid360.launch",       desc: "mid360 + mapping, no prior" },
+  "mapping-mid360-prior":   { launch: "bringup_mid360_prior.launch", desc: "mid360 + mapping, prior map" },
+  "mapping-mid360-reloc":   { launch: "bringup_mid360_reloc.launch", desc: "mid360 + mapping, prior + align" },
+  "mapping-mid360s":         { launch: "bringup_mid360s.launch",       desc: "mid360s + mapping, no prior" },
+  "mapping-mid360s-prior":   { launch: "bringup_mid360s_prior.launch", desc: "mid360s + mapping, prior map" },
+  "mapping-mid360s-reloc":   { launch: "bringup_mid360s_reloc.launch", desc: "mid360s + mapping, prior + align" },
+  "smoke-fov":                { launch: "smoke_fov.launch",             desc: "FOV crop visual smoke test" },
 } as const;
 
 export type RecipeName = keyof typeof RECIPES;

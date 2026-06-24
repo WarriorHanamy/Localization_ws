@@ -1,223 +1,112 @@
 /**
  * FAST-LIO Smoke Test
  *
- * Runs a codified checklist against the Jetson at 192.168.55.1.
- * Each check item has an expected threshold — if the measured value
- * meets or exceeds it, the check passes.
+ * Human-in-the-loop visual tests and automated data-link checks,
+ * all launched via Docker containers.
  *
  * Usage:
- *   bun run smoke              # all checks
- *   bun run smoke --level slam # only SLAM layer
+ *   bun run smoke fov                    # FOV crop visual comparison (RVIZ + VNC)
+ *   bun run smoke data_link <recipe>    # data-link frequency check (headless)
+ *   bun run smoke                        # show help
  */
-import { runSSH, runSSHDetached, sshTarget, isUSBReachable } from "../core/ssh";
-import { REC_DEVICE_LOC_WS, ROS_DISTRO, REMOTE_USER, REMOTE_HOST_USB, SSH_OPTS, type RecipeName } from "../core/config";
-import { startContainer } from "./docker-start";
+import { REC_DEVICE_LOC_WS, ROS_DISTRO, REMOTE_USER, REMOTE_HOST_USB, SSH_OPTS, RECIPES, type RecipeName } from "../core/config";
+import { statSync } from "fs";
 
-// ═══════════════════════════════════════════════════════════════
-// Smoke Test Checklist (codified)
-// level       — pipeline layer
-// name        — human-readable label
-// topic       — ROS topic / node name / MQTT topic / URL
-// check       — detection method: hz | node | proc | mqtt | http
-// expect      — human-readable expectation (for display)
-// threshold   — numeric pass threshold
-// ═══════════════════════════════════════════════════════════════
-
-interface SmokeItem {
-  level: "driver" | "slam" | "bridge" | "web";
-  name: string;
-  topic: string;
-  check: "hz" | "node" | "proc" | "mqtt" | "http";
-  expect: string;
-  threshold: number;
-}
-
-const CHECKLIST: SmokeItem[] = [
-  // L1 — LiDAR driver
-  { level: "driver", name: "LiDAR point cloud",  topic: "/livox/lidar",    check: "hz",   expect: ">=5 Hz",    threshold: 5 },
-  { level: "driver", name: "IMU data",            topic: "/livox/imu",      check: "hz",   expect: ">=50 Hz",   threshold: 50 },
-
-  // L2 — FAST-LIO SLAM
-  { level: "slam",   name: "Odometry",            topic: "/Odometry",       check: "hz",   expect: ">=5 Hz",    threshold: 5 },
-  { level: "slam",   name: "Registered cloud",    topic: "/cloud_registered",check: "hz",   expect: ">=5 Hz",    threshold: 5 },
-  { level: "slam",   name: "Prior local cloud",   topic: "/prior_local_cloud", check: "hz", expect: ">=1 Hz",   threshold: 1 },
-  { level: "slam",   name: "Combined cloud",      topic: "/cloud_registered_with_prior", check: "hz", expect: ">=5 Hz", threshold: 5 },
-  { level: "slam",   name: "CPU usage",           topic: "/cpu_usage",      check: "hz",   expect: ">=1 Hz",    threshold: 1 },
-  { level: "slam",   name: "laserMapping alive",  topic: "/laserMapping",   check: "node", expect: "running",  threshold: 0 },
-
-  // L3 — MQTT bridge
-  { level: "bridge", name: "mqtt_bridge process", topic: "mqtt_bridge",     check: "proc", expect: "running",  threshold: 0 },
-  { level: "bridge", name: "MQTT odometry",       topic: "l10n/odometry",   check: "mqtt", expect: ">0 bytes",  threshold: 1 },
-  { level: "bridge", name: "MQTT cloud",          topic: "l10n/cloud",      check: "mqtt", expect: ">0 bytes",  threshold: 1 },
-
-  // L4 — Web servers
-  { level: "web",    name: "Relay server",        topic: "http://localhost:3000", check: "http", expect: "200", threshold: 0 },
-  { level: "web",    name: "Vite dev server",     topic: "http://localhost:5173", check: "http", expect: "200", threshold: 0 },
-];
-
-// ═══════════════════════════════════════════════════════════════
-
-interface CheckResult {
-  item: SmokeItem;
-  pass: boolean;
-  actual: string;
-}
-
-function rosEnv(): string {
-  return `source /opt/ros/${ROS_DISTRO}/setup.bash && source ${REC_DEVICE_LOC_WS}/devel/setup.bash`;
-}
-
-/** Parse rostopic hz output: "average rate: 9.858" → 9.858 */
-function parseHz(stdout: string): number {
-  const m = stdout.match(/average rate:\s*([\d.]+)/);
-  return m ? parseFloat(m[1]) : 0;
-}
-
-async function checkHz(topic: string): Promise<{ value: number; detail: string }> {
-  const cmd = `${rosEnv()} && timeout 6 rostopic hz ${topic} --window=5 2>&1 | grep "average rate" | tail -1`;
-  const { stdout } = await runSSH(cmd, false);
-  const hz = parseHz(stdout);
-  return { value: hz, detail: stdout.trim() || "(no output)" };
-}
-
-async function checkNode(name: string): Promise<{ value: number; detail: string }> {
-  const cmd = `${rosEnv()} && rosnode list 2>/dev/null | grep -q ${name} && echo "RUNNING" || echo "NOT"`;
-  const { stdout } = await runSSH(cmd, false);
-  const running = stdout.includes("RUNNING");
-  return { value: running ? 1 : 0, detail: running ? "running" : "not found" };
-}
-
-async function checkProc(name: string): Promise<{ value: number; detail: string }> {
-  const cmd = `pgrep -af ${name} 2>/dev/null | grep -v pgrep | head -1 || echo "NONE"`;
-  const { stdout } = await runSSH(cmd, false);
-  const running = !stdout.includes("NONE");
-  return { value: running ? 1 : 0, detail: running ? stdout.trim().split("\n")[0] : "not running" };
-}
-
-async function checkMqtt(topic: string): Promise<{ value: number; detail: string }> {
-  const cmd = `timeout 4 mosquitto_sub -t ${topic} -C 1 -W 3 2>/dev/null | wc -c`;
-  const { stdout } = await runSSH(cmd, false);
-  const bytes = parseInt(stdout.trim() || "0", 10);
-  return { value: bytes, detail: `${bytes} bytes` };
-}
-
-async function checkHttp(url: string): Promise<{ value: number; detail: string }> {
-  try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(3000) });
-    const ok = resp.ok ? 1 : 0;
-    return { value: ok, detail: `${resp.status}` };
-  } catch (err: any) {
-    return { value: 0, detail: err.message };
-  }
-}
-
-async function runCheck(item: SmokeItem): Promise<CheckResult> {
-  let result: { value: number; detail: string };
-  switch (item.check) {
-    case "hz":   result = await checkHz(item.topic);   break;
-    case "node": result = await checkNode(item.topic); break;
-    case "proc": result = await checkProc(item.topic); break;
-    case "mqtt": result = await checkMqtt(item.topic); break;
-    case "http": result = await checkHttp(item.topic); break;
-  }
-  const pass = item.threshold === 0 ? result.value > 0 : result.value >= item.threshold;
-  const actual = item.check === "hz"
-    ? `${result.value.toFixed(1)} Hz`
-    : item.check === "mqtt"
-      ? `${result.value} bytes`
-      : item.check === "http"
-        ? `${result.detail}`
-        : result.value > 0 ? "running" : "not running";
-
-  return { item, pass, actual };
-}
-
-function fmtLabel(item: SmokeItem): string {
-  return item.name.padEnd(25) + item.topic.padEnd(35);
-}
-
-function fmtStatus(pass: boolean, actual: string, expect: string): string {
-  const mark = pass ? "✓" : "✗";
-  const col = pass ? "\x1b[32m" : "\x1b[31m";
-  const rst = "\x1b[0m";
-  return `${col}${mark}${rst} ${actual.padEnd(14)} (expected ${expect})`;
-}
-
-async function ensureNativeDriver(): Promise<void> {
-  console.log("\n\x1b[1;33m[pre-flight] Ensuring native LiDAR driver is healthy...\x1b[0m");
-
-  const ros = `source /opt/ros/${ROS_DISTRO}/setup.bash`;
-  const rosDev = `${ros} && source ${REC_DEVICE_LOC_WS}/devel/setup.bash 2>/dev/null`;
-
-  // Step 1 — kill zombie livox processes
-  await runSSH("sudo -n pkill -9 -f livox_ros_driver2 2>/dev/null; sleep 2; echo OK", false);
-
-  // Step 2 — ensure roscore is running
-  { const { stdout } = await runSSH(`${ros} && timeout 3 rostopic list 2>&1 | grep -q /rosout && echo OK || echo NO`, false);
-    if (!stdout.includes("OK")) {
-      await runSSHDetached(`${ros} && roscore`);
-      await new Promise(r => setTimeout(r, 3000));
-    } }
-
-  // Step 3 — read lidar IP from config
-  const { stdout: lidarIpRaw } = await runSSH(`jq -r '.lidar_configs[0].ip // empty' ${REC_DEVICE_LOC_WS}/bringup/config/MID360s_config.json 2>/dev/null || echo 192.168.2.88`, false);
-  const lidarIp = lidarIpRaw.trim() || "192.168.2.88";
-
-  // Step 4 — check if driver is already publishing IMU
-  {
-    const { stdout } = await runSSH(`${ros} && timeout 4 rostopic hz /livox/imu --window=20 2>&1 | grep "average rate" | tail -1 || echo NO`, false);
-    const m = stdout.match(/average rate:\s*([\d.]+)/);
-    if (m) {
-      console.log(`  \x1b[32mOK\x1b[0m native driver alive (IMU ${parseFloat(m[1]).toFixed(0)} Hz, lidar=${lidarIp})`);
-      return;
-    }
-  }
-
-  // Step 5 — set params and start driver in background
-  console.log(`  Starting native driver for lidar ${lidarIp}...`);
-  await runSSH([
-    `${ros} &&`,
-    `rosparam set /user_config_path ${REC_DEVICE_LOC_WS}/bringup/config/MID360s_config.json &&`,
-    `rosparam set /xfer_format 0 &&`,
-    `rosparam set /multi_topic 0 &&`,
-    `rosparam set /data_src 0 &&`,
-    `rosparam set /cmdline_str ${lidarIp} &&`,
-    `rosparam set /frame_id livox_frame &&`,
-    `echo PARAMS_SET`,
-  ].join(" "), false);
-  await runSSHDetached(`${rosDev} && rosrun livox_ros_driver2 livox_ros_driver2_node ${lidarIp} __name:=livox_lidar_publisher2`);
-
-  // Step 6 — poll until IMU data flows (up to 20s)
-  for (let i = 0; i < 5; i++) {
-    await new Promise(r => setTimeout(r, 4000));
-    const { stdout } = await runSSH(`${ros} && timeout 3 rostopic hz /livox/imu --window=20 2>&1 | grep "average rate" | tail -1 || echo NO`, false);
-    const m = stdout.match(/average rate:\s*([\d.]+)/);
-    if (m) {
-      console.log(`  \x1b[32mOK\x1b[0m driver started (IMU ${parseFloat(m[1]).toFixed(0)} Hz)`);
-      return;
-    }
-  }
-
-  console.log("  \x1b[31mFAIL\x1b[0m driver did not start — run manually: rosrun livox_ros_driver2 livox_ros_driver2_node " + lidarIp);
-}
+// ---- utils ----
 
 function onDeviceHost(): boolean {
   if (process.env.LOCALIZATION_DEVICE_HOST === "1") return true;
-  return process.cwd().startsWith(REC_DEVICE_LOC_WS);
+  if (process.cwd().startsWith(REC_DEVICE_LOC_WS)) return true;
+  try { statSync(REC_DEVICE_LOC_WS); return true; } catch { return false; }
 }
 
-async function doSmokeFov(): Promise<void> {
-  const SESSION = "smoke-fov";
-  const recipeName = "smoke-fov" as RecipeName;
-  const containerName = `fastlio-${recipeName}`;
-  const rvizCfg = `${REC_DEVICE_LOC_WS}/src/bringup/rviz_cfg/smoke_fov_test.rviz`;
+function dockerSpawn(args: string[]): { exitCode: number; stdout: string; stderr: string } {
+  const p = Bun.spawnSync(args, { stdout: "pipe", stderr: "pipe" });
+  return { exitCode: p.exitCode, stdout: p.stdout.toString(), stderr: p.stderr.toString() };
+}
 
-  // Devel-host: SSH bridge with TTY
+function recipeLaunch(name: string): { launch: string; fullName: string } | null {
+  // Exact match
+  const exact = RECIPES[name as RecipeName];
+  if (exact) return { launch: exact.launch, fullName: name };
+  // Try mapping- prefix (e.g. "mid360" → "mapping-mid360")
+  const prefixed = `mapping-${name}`;
+  const p = RECIPES[prefixed as RecipeName];
+  if (p) return { launch: p.launch, fullName: prefixed };
+  return null;
+}
+
+function fzfPick(options: string[]): string | null {
+  const input = options.sort().join("\n");
+  const proc = Bun.spawnSync(["bash", "-c", `echo "$1" | fzf --height=20% --header=Select a recipe`, "_", input], {
+    stdout: "pipe",
+    stderr: "inherit",
+  });
+  if (proc.exitCode !== 0) return null;
+  return proc.stdout.toString().trim();
+}
+
+// ---- data_link ----
+
+interface SmokeResult {
+  level: string;
+  name: string;
+  target: string;
+  expected: string;
+  value: number;
+  actual: string;
+  pass: boolean;
+}
+
+function parseResults(stdout: string): SmokeResult[] {
+  const results: SmokeResult[] = [];
+  for (const line of stdout.split("\n")) {
+    if (!line.startsWith("SMOKE_RESULT\t")) continue;
+    const [, level, name, target, expected, value, actual, passed] = line.split("\t");
+    results.push({
+      level, name, target, expected,
+      value: Number(value), actual,
+      pass: passed === "1",
+    });
+  }
+  return results;
+}
+
+function printResults(results: SmokeResult[]): void {
+  let currentLevel = "";
+  for (const r of results) {
+    if (r.level !== currentLevel) {
+      currentLevel = r.level;
+      console.log(`\n\x1b[1;36m${r.level.toUpperCase()}\x1b[0m`);
+    }
+    const mark = r.pass ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✗\x1b[0m";
+    console.log(`  ${r.name.padEnd(25)} ${r.target.padEnd(35)} ${mark} ${r.actual} (expected ${r.expected})`);
+  }
+}
+
+async function doSmokeDataLink(recipeArg: string): Promise<void> {
+  // Resolve short name or prompt via fzf
+  let resolved: { launch: string; fullName: string } | null = null;
+  if (recipeArg) {
+    resolved = recipeLaunch(recipeArg);
+  } else if (process.stdin.isTTY) {
+    const pick = fzfPick(Object.keys(RECIPES));
+    if (pick) resolved = recipeLaunch(pick);
+  }
+  if (!resolved) {
+    console.error(`[smoke] Unknown recipe: ${recipeArg || "(none)"}`);
+    console.error(`  Known: ${Object.keys(RECIPES).sort().join(" ")}`);
+    process.exit(1);
+  }
+
+  const { launch, fullName } = resolved;
+  const containerName = `fastlio-${fullName}-smoke`;
+
+  // Devel-host: SSH bridge (no TTY needed — headless)
   if (!onDeviceHost()) {
     const target = `${REMOTE_USER}@${REMOTE_HOST_USB}`;
     const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
-    opts.unshift("-t");
-    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke fov`;
+    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke data_link ${recipeArg}`;
     const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
       stdio: ["inherit", "inherit", "inherit"],
     });
@@ -225,20 +114,156 @@ async function doSmokeFov(): Promise<void> {
   }
 
   // ---- Below runs on device-host ----
-  // Kill stale tmux session
+
+  // Clean stale
+  dockerSpawn(["docker", "stop", containerName]);
+  dockerSpawn(["docker", "rm", containerName]);
+
+  // Start container
+  console.log(`[smoke] Starting container '${containerName}' (${launch}) ...`);
+  const run = dockerSpawn([
+    "docker", "run", "-d",
+    "--name", containerName,
+    "--network", "host", "--ipc", "host", "--privileged",
+    "-e", "DISPLAY=:0",
+    "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+    "-v", `${REC_DEVICE_LOC_WS}/PCD:/catkin_ws/src/fast_lio/PCD`,
+    "-v", `${REC_DEVICE_LOC_WS}/bringup:/catkin_ws/src/bringup`,
+    "fastlio-jetson:latest",
+    "roslaunch", "bringup", launch,
+  ]);
+  if (run.exitCode !== 0) {
+    console.error(`[smoke] docker run failed (exit ${run.exitCode})`);
+    console.error(run.stderr);
+    process.exit(1);
+  }
+
+  // Run container-smoke.sh inside Docker (script has its own startup timeout)
+  console.log(`[smoke] Running container-smoke.sh inside '${containerName}' ...`);
+  const script = "/catkin_ws/src/bringup/scripts/container-smoke.sh";
+  const mode = launch.includes("bringup_") ? "mapping" : "driver";
+  const exec = dockerSpawn([
+    "docker", "exec", containerName,
+    "bash", script, mode,
+  ]);
+  if (exec.exitCode !== 0) {
+    console.error(`[smoke] container-smoke.sh failed (exit ${exec.exitCode})`);
+    console.error(exec.stderr || exec.stdout);
+    process.exit(1);
+  }
+
+  const results = parseResults(exec.stdout);
+  if (results.length === 0) {
+    console.error("[smoke] No SMOKE_RESULT lines in output.");
+    console.error(exec.stderr || exec.stdout);
+    process.exit(1);
+  }
+
+  printResults(results);
+
+  const failed = results.filter((r) => !r.pass);
+  console.log(`\n${"—".repeat(55)}`);
+  if (failed.length === 0) {
+    console.log(`  \x1b[32mALL ${results.length}/${results.length} PASSED\x1b[0m`);
+    Bun.write("/tmp/smoke-hardware", fullName);
+  } else {
+    console.log(`  \x1b[32mPASS ${results.length - failed.length}/${results.length}\x1b[0m  \x1b[31mFAIL ${failed.length}/${results.length}\x1b[0m`);
+    process.exit(1);
+  }
+
+  // Clean up
+  dockerSpawn(["docker", "stop", containerName]);
+  dockerSpawn(["docker", "rm", containerName]);
+}
+
+// ---- fov ----
+
+function readHardwareState(): string | null {
+  const p = Bun.spawnSync(["cat", "/tmp/smoke-hardware"], {
+    stdout: "pipe", stderr: "ignore",
+  });
+  return (p.exitCode === 0) ? p.stdout.toString().trim() || null : null;
+}
+
+async function doSmokeFov(recipeArg?: string): Promise<void> {
+  const stateHw = readHardwareState();
+  const resolved = recipeLaunch(recipeArg || stateHw || "mid360s");
+  if (!resolved) {
+    console.error(`[smoke] Unknown recipe: ${recipeArg || "(none)"}`);
+    process.exit(1);
+  }
+  const { fullName } = resolved;
+  const hardware = fullName; // "mid360" or "mid360s"
+
+  const SESSION = "smoke-fov";
+  const containerName = "fastlio-smoke-fov";
+    const rvizCfg = `${REC_DEVICE_LOC_WS}/src/bringup/rviz_cfg/smoke_fov_test.rviz`;
+
+  // Devel-host: open VNC viewer, then SSH bridge with TTY
+  if (!onDeviceHost()) {
+    const target = `${REMOTE_USER}@${REMOTE_HOST_USB}`;
+    const vncViewer = Bun.which("gvncviewer") || Bun.which("vncviewer");
+    if (vncViewer) {
+      Bun.spawn([vncViewer, "192.168.55.1:0"], { stdout: "ignore", stderr: "ignore" });
+      console.log(`[smoke] VNC viewer opened: ${vncViewer} 192.168.55.1:0`);
+    } else {
+      console.log("[smoke] Install gvncviewer or vncviewer to see RVIZ remotely.");
+      console.log("[smoke]   Arch:  sudo pacman -S gtk-vnc");
+      console.log("[smoke]   macOS: brew install tigervnc-viewer");
+    }
+    const opts = SSH_OPTS.split(/\s+/).filter(Boolean);
+    opts.unshift("-t");
+    const recipePart = recipeArg ? ` ${recipeArg}` : "";
+    const remoteCmd = `cd ${REC_DEVICE_LOC_WS} && bun run smoke fov${recipePart}`;
+    const proc = Bun.spawnSync(["ssh", ...opts, target, remoteCmd], {
+      stdio: ["inherit", "inherit", "inherit"],
+    });
+    process.exit(proc.exitCode);
+  }
+
+  // ---- Below runs on device-host ----
   Bun.spawnSync(["tmux", "kill-session", "-t", SESSION], { stderr: "ignore" });
 
-  // Start container (docker-start handles stale container cleanup)
-  console.log(`[smoke] Starting container '${containerName}' ...`);
-  await startContainer(recipeName);
+  // Ensure x11vnc is sharing display :0 for devel-host VNC viewer
+  Bun.spawnSync(["pkill", "x11vnc", "--older", "10"], { stderr: "ignore", stdout: "ignore" });
+  const vncCheck = Bun.spawnSync(["pgrep", "x11vnc"], { stderr: "ignore", stdout: "pipe" });
+  if (vncCheck.exitCode !== 0) {
+    console.log("[smoke] Starting x11vnc for display :0 ...");
+    Bun.spawn(["x11vnc", "-display", ":0", "-forever", "-quiet", "-shared"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    await Bun.sleep(1);
+  }
 
-  // Create tmux session with slam window (tails container log)
+  // Start Docker container locally
+  console.log(`[smoke] Starting container '${containerName}' ...`);
+  Bun.spawnSync(["docker", "stop", containerName], { stderr: "ignore", stdout: "ignore" });
+  Bun.spawnSync(["docker", "rm", containerName], { stderr: "ignore", stdout: "ignore" });
+  const dockerRun = Bun.spawnSync([
+    "docker", "run", "-d",
+    "--name", containerName,
+    "--network", "host", "--ipc", "host", "--privileged",
+    "-e", "DISPLAY=:0",
+    "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+    "-v", `${REC_DEVICE_LOC_WS}/PCD:/catkin_ws/src/fast_lio/PCD`,
+    "-v", `${REC_DEVICE_LOC_WS}/bringup:/catkin_ws/src/bringup`,
+    "fastlio-jetson:latest",
+    "roslaunch", "bringup", "smoke_fov.launch", `hardware:=${hardware}`,
+  ]);
+  if (dockerRun.exitCode !== 0) {
+    console.error(`[smoke] docker run failed (exit ${dockerRun.exitCode})`);
+    console.error(dockerRun.stderr.toString());
+    process.exit(1);
+  }
+
+  // Create tmux session
   console.log(`[smoke] Creating tmux session '${SESSION}' ...`);
   Bun.spawnSync(["tmux", "new-session", "-d", "-s", SESSION, "-n", "slam"]);
   Bun.spawnSync(["tmux", "send-keys", "-t", `${SESSION}:slam`,
     `docker logs -f ${containerName} 2>&1`, "Enter"]);
 
-  // RVIZ window (runs natively on display :0, container has --network host)
+  // RVIZ window (runs natively on display :0 — viewed via VNC)
   Bun.spawnSync(["tmux", "new-window", "-t", SESSION, "-n", "rviz"]);
   Bun.spawnSync(["tmux", "send-keys", "-t", `${SESSION}:rviz`,
     `sleep 6 && export DISPLAY=:0 && source /opt/ros/${ROS_DISTRO}/setup.bash && rviz -d ${rvizCfg}`, "Enter"]);
@@ -259,72 +284,23 @@ async function doSmokeFov(): Promise<void> {
   }
 }
 
+// ---- entry ----
+
 export async function cmdSmoke(args: string[]): Promise<void> {
-  if (args[0] === "fov") {
-    await doSmokeFov();
+  const sub = args[0];
+
+  if (sub === "fov") {
+    await doSmokeFov(args[1]);
     return;
   }
-  const filterLevel = args.includes("--level") ? args[args.indexOf("--level") + 1] : null;
-  const items = filterLevel
-    ? CHECKLIST.filter((c) => c.level === filterLevel)
-    : CHECKLIST;
 
-  if (!(await isUSBReachable())) {
-    console.log("[smoke] Jetson (192.168.55.1) not reachable. Only web checks will run.\n");
+  if (sub === "data_link") {
+    await doSmokeDataLink(args[1]);
+    return;
   }
 
-  const reachable = await isUSBReachable();
-
-  if (reachable && (!filterLevel || filterLevel === "driver")) {
-    await ensureNativeDriver();
-  }
-  let currentLevel = "";
-  const results: CheckResult[] = [];
-
-  for (const item of items) {
-    if (item.level !== currentLevel) {
-      currentLevel = item.level;
-      console.log(`\n${"\x1b[1;36m"}L${item.level === "driver" ? "1" : item.level === "slam" ? "2" : item.level === "bridge" ? "3" : "4"} ${item.level.toUpperCase()}\x1b[0m ${"—".repeat(40 - item.level.length)}`);
-    }
-
-    // Skip remote checks if Jetson is unreachable
-    if (!reachable && item.check !== "http") {
-      console.log(`  ${fmtLabel(item)}  \x1b[2m(skipped — no SSH)\x1b[0m`);
-      continue;
-    }
-
-    const result = await runCheck(item);
-    results.push(result);
-    console.log(`  ${fmtLabel(item)}  ${fmtStatus(result.pass, result.actual, item.expect)}`);
-  }
-
-  // ═══════════════════
-  // Summary
-  // ═══════════════════
-  const passed = results.filter((r) => r.pass).length;
-  const failed = results.filter((r) => !r.pass).length;
-  const total = results.length;
-
-  console.log(`\n${"—".repeat(55)}`);
-  if (total === 0) {
-    console.log("  No checks executed.");
-  } else if (failed === 0) {
-    console.log(`  \x1b[32mALL ${total}/${total} PASSED\x1b[0m`);
-  } else {
-    console.log(`  \x1b[32mPASS ${passed}/${total}\x1b[0m   \x1b[31mFAIL ${failed}/${total}\x1b[0m`);
-    console.log("\n  Failed checks:");
-    for (const r of results) {
-      if (!r.pass) {
-        console.log(`    ✗ ${r.item.check} ${r.item.topic}  actual=${r.actual}  expected=${r.item.expect}`);
-      }
-    }
-    console.log("\n  Possible causes:");
-    console.log("    • LiDAR/IMU hz=0  → 检查 Livox 驱动 USB 连接及 IP 配置");
-    console.log("    • SLAM hz=0       → laserMapping 在 IMU 初始化阶段卡死（需 IMU 数据持续涌入 50 帧）");
-    console.log("    • MQTT bytes=0    → mqtt_bridge.py 回调未触发，检查 /home/nv/.ros/log 下的日志");
-    console.log("    • Web 连不上      → bun run view:fastlio 是否在运行");
-  }
-  console.log("");
-
-  process.exit(failed > 0 ? 1 : 0);
+  console.log("[smoke] smoke test commands:");
+  console.log("  bun run smoke fov                     FOV crop visual check (RVIZ + VNC)");
+  console.log("  bun run smoke data_link <recipe>      data-link frequency check (headless)");
+  console.log(`  Recipes: ${Object.keys(RECIPES).sort().join(" ")}`);
 }

@@ -24,9 +24,9 @@ Commands:
   dashboard         start web dashboard (auto-launch SLAM + serve frontend)
   dashboard --dev   start in dev mode (Vite HMR proxy)
   dashboard --no-launch  skip auto-launching SLAM pipeline
-  smoke             run FAST-LIO smoke test checklist
-  smoke --level slam  only check SLAM layer
-  smoke fov         FOV crop smoke test (sync+build+launch+RVIZ)
+  smoke fov                     FOV crop visual smoke test (RVIZ + VNC)
+  smoke data_link [recipe]       data-link frequency check (headless, fzf picker)
+  smoke                          show smoke test help
 
 Docker commands:
   docker-dbuild      build fastlio-jetson image on Jetson (SSH)

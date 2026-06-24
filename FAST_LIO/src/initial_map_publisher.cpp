@@ -15,8 +15,8 @@ int main(int argc, char** argv)
 
     bool initial_map_from_pcd_;
     string initial_map_pcd_name_;
-    nh.param<bool>("wxx/initial_map_from_pcd", initial_map_from_pcd_, true);
-    nh.param<string>("wxx/initial_map_pcd_name", initial_map_pcd_name_, "initial_map.pcd");
+    nh.param<bool>("map/load_from_pcd", initial_map_from_pcd_, true);
+    nh.param<string>("map/pcd_file", initial_map_pcd_name_, "initial_map.pcd");
     ros::Publisher pub = nh.advertise<sensor_msgs::PointCloud2>("initial_map", 1);
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     sensor_msgs::PointCloud2::Ptr msg(new sensor_msgs::PointCloud2);
