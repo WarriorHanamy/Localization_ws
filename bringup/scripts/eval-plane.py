@@ -1,7 +1,7 @@
 #!/bin/bash
 # L1 smoke check: LiDAR + IMU topic types and frequency
 # Prints SMOKE_RESULT lines, returns 0 on pass, 1 on fail
-set -eo pipefail
+set -euo pipefail
 
 source /opt/ros/noetic/setup.bash
 if [[ -f /catkin_ws/devel/setup.bash ]]; then
@@ -11,12 +11,7 @@ fi
 export ROS_PACKAGE_PATH=/catkin_ws/src:$ROS_PACKAGE_PATH
 if ! rostopic list >/dev/null 2>&1; then
   roscore &
-  for _ in $(seq 1 10); do
-    if rostopic list >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
+  sleep 2
 fi
 
 BOLD="\\033[1m"
@@ -39,11 +34,10 @@ check() {
 
   # Frequency check
   if [[ "$imu" == "1" ]]; then
-    actual_hz=$(timeout 6 rostopic hz --window=500 "$topic" 2>/dev/null | awk '/average rate:/{v=$3} END{print int(v+0.5)}')
+    actual_hz=$(timeout 6 rostopic hz --window=500 "$topic" 2>/dev/null | awk '/average rate:/{v=$3} END{print int(v+0.5)}' || echo "0")
   else
-    actual_hz=$(timeout 6 rostopic hz "$topic" 2>/dev/null | awk '/average rate:/{v=$3} END{print int(v+0.5)}')
+    actual_hz=$(timeout 6 rostopic hz "$topic" 2>/dev/null | awk '/average rate:/{v=$3} END{print int(v+0.5)}' || echo "0")
   fi
-  actual_hz=${actual_hz:-0}
 
   if [[ "$actual_hz" -ge "$min_hz" ]]; then
     pass_hz="PASS"

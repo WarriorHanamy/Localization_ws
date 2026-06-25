@@ -113,9 +113,12 @@ RUN find /opt/ros/noetic/share/<pkg>/cmake -name '*.cmake' -exec \
     sed -i 's|/catkin_ws/devel|/opt/ros/noetic|g' {} \;
 ```
 
-### 3b: entrypoint.sh
+### 3b: entrypoint script (service layer)
 
-Drop hard dependency on `/catkin_ws/devel/`:
+Entrypoint lives in `bringup/scripts/entrypoint-*.sh` as part of the runtime bundle,
+not in the Docker image. See `.agents/skills/entities-development-ids/SKILL.md` §5.x.
+
+The service entrypoint drops hard dependency on `/catkin_ws/devel/`:
 
 ```bash
 source /opt/ros/noetic/setup.bash
@@ -174,6 +177,6 @@ bun run smoke l1-<imu> <hw>           # user-level acceptance
 | `bringup/resource/<pkg>/`                       | New: pre-built artifacts (committed git)          |
 | `bringup/resource/MANIFEST`                     | Edit: append mapping entries                      |
 | `docker/Dockerfile.<target>`                    | Replace `catkin_make` with `COPY` + `RUN sed`       |
-| `docker/entrypoint.sh`                          | Conditional devel source + `ROS_PACKAGE_PATH`       |
+| `bringup/scripts/entrypoint-*.sh`                | Service entrypoint (runtime bundle, bind-mounted)    |
 | `src/cli/docker-build.ts`                       | Add `bringup/resource/` targeted rsync (first time only) |
 | `.gitignore`                                    | May need `!` exceptions for binary files          |

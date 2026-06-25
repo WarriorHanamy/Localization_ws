@@ -16,3 +16,6 @@ RUN . /opt/ros/noetic/setup.sh && \
 
 # PCD storage — symlink bringup (bind-mounted at runtime) into fast_lio runtime path
 RUN ln -sfn /catkin_ws/src/bringup/PCD /catkin_ws/src/fast_lio/PCD
+
+# Service entrypoint — points to bind-mounted script (runtime bundle)
+ENTRYPOINT ["bash", "/catkin_ws/src/bringup/scripts/entrypoint-prod.sh"]

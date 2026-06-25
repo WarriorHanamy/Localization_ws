@@ -11,7 +11,12 @@ fi
 export ROS_PACKAGE_PATH=/catkin_ws/src:$ROS_PACKAGE_PATH
 if ! rostopic list >/dev/null 2>&1; then
   roscore &
-  sleep 2
+  for _ in $(seq 1 10); do
+    if rostopic list >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
 fi
 
 BOLD="\\033[1m"

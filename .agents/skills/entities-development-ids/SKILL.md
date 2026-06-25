@@ -104,7 +104,7 @@ Fleet-devices use a one-line bootstrap script (`curl ... | bash`) that:
 5. Reads `manifest.yaml` → determines image tag + docker run args
 6. `docker pull` from dev-host registry `:5000`
 7. Stops old container, starts new one
-8. Polls for `/tmp/slam_ready` health signal
+8. Polls L1 smoke check via `docker exec ... check-l1.sh` (max 30s)
 9. Prints deployment summary
 
 No SSH, no rsync, no Bun, no local docker build on fleet devices.
@@ -122,26 +122,58 @@ Launch flags (shared by both dev-device and fleet-device):
 --name <name>       container identity
 ```
 
-Container filesystem:
+Container filesystem (image snapshot):
 
 ```
-/entrypoint.sh                         source ROS + devel, auto-start roscore if none
 /opt/ros/noetic/                       ROS Noetic (arm64)
 /catkin_ws/devel/                      catkin_make build artifacts (image snapshot)
-/catkin_ws/src/bringup/config/         JSON configs, YAML files (bundled in image)
-/catkin_ws/src/bringup/launch/         roslaunch files (bundled in image)
 /usr/local/lib/                        Livox SDK2 prebuilt .a / .so
 /usr/local/include/                    Livox SDK2 headers
 ```
 
-Bind mounts:
+Bind mounts (runtime overlay):
 
 ```
--v ${REC_DEVICE_LOC_WS}/PCD:/catkin_ws/src/fast_lio/PCD       (writable PCD output)
--v ${REC_DEVICE_LOC_WS}/bringup:/catkin_ws/src/bringup         (live configs + launch files)
+-v .../config:/catkin_ws/src/bringup/config:ro         JSON/YAML configs (runtime bundle)
+-v .../launch:/catkin_ws/src/bringup/launch:ro         roslaunch files (runtime bundle)
+-v .../scripts:/catkin_ws/src/bringup/scripts:ro       entrypoints + health checks (runtime bundle)
+-v .../PCD:/catkin_ws/src/fast_lio/PCD                 PCD output (writable)
+-v .../data/logs:/root/.ros/log                        ROS logs (writable)
 ```
 
-On fleet-devices, `bringup/` is populated from the HTTP tarball before container start.
+> Container entrypoint is declared by each downstream image (e.g., `lio-slam`) and
+> points to a bind-mounted script at `/catkin_ws/src/bringup/scripts/entrypoint-*.sh`.
+> See §5.x Entrypoint Layering Rule.
+
+On fleet-devices, `config/`, `launch/`, and `scripts/` come from the runtime bundle tarball.
+
+### 5.x Entrypoint Layering Rule
+
+Entrypoint belongs to the **service layer**, never to the base image.
+
+| Layer          | Image               | Role                                                    |
+| -------------- | ------------------- | ------------------------------------------------------- |
+| Infrastructure | `lio-base`            | ROS + deps + drivers. No ENTRYPOINT. `CMD ["bash"]`.      |
+| Service        | `lio-slam`, `lio-calib` | Declares own ENTRYPOINT → binds runtime bundle script. |
+
+Each downstream Dockerfile declares:
+
+```dockerfile
+ENTRYPOINT ["bash", "/catkin_ws/src/bringup/scripts/entrypoint-prod.sh"]
+```
+
+The actual entrypoint script lives in `bringup/scripts/`, delivered via runtime bundle.
+Only the ENTRYPOINT **path** (metadata) is in the Dockerfile — the script content is mutable
+from the outside via bind-mount.
+
+**Rationale**: Entrypoint content changes (roscore polling, health checks, env init) must
+not trigger Docker image rebuilds. Only ENTRYPOINT path changes require a rebuild, and the
+path rarely changes after initial service definition.
+
+**Effect**:
+- Entrypoint script change → `bun run fleet-bundle` (no image rebuild)
+- New health check script (check-l1, check-l2) → `bun run fleet-bundle` (no image rebuild)
+- C++ code change → `bun run docker-dbuild`
 
 ## 6. Log Sources
 
@@ -159,7 +191,7 @@ This captures stdout from:
 
 | Node                      | What to look for                           |
 | ------------------------- | ------------------------------------------ |
-| entrypoint.sh             | roscore startup, ROS env sourcing          |
+| entrypoint-prod.sh        | roscore startup, ROS env sourcing          |
 | livox_lidar_publisher2    | `Init lds lidar failed!`, data rate        |
 | laserMapping              | `IMU Init`, point cloud registration       |
 | cpu_monitor               | CPU affinity assignment                    |
@@ -190,9 +222,13 @@ fleet-devices operate autonomously. Log inspection requires physical access or
 on-board telemetry (MQTT bridge → dashboard). The same Docker stdout and ROS
 log paths exist inside the container, but there is no dev-host SSH bridge.
 
-Container readiness is signaled inside the container at `/tmp/slam_ready`
-(created by `docker/entrypoint.sh` when `/Odometry` topic appears).
-The bootstrap script checks this file via `docker exec` after container start.
+Container readiness is verified by the fleet bootstrap script via L1 smoke check:
+
+```bash
+docker exec fastlio-runtime bash /catkin_ws/src/bringup/scripts/check-l1.sh
+```
+
+This polls `/livox/lidar` and `/livox/imu` topics. See `.agents/skills/fleet-bootstrap/SKILL.md` §3 step 12.
 
 ## 7. Quick Reference
 

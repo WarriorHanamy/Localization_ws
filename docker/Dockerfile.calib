@@ -14,3 +14,6 @@ COPY LiDAR_IMU_Init/ /catkin_ws/src/lidar_imu_init/
 RUN . /opt/ros/noetic/setup.sh && \
   cd /catkin_ws && \
   catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+# Service entrypoint — points to bind-mounted script (runtime bundle)
+ENTRYPOINT ["bash", "/catkin_ws/src/bringup/scripts/entrypoint-calib.sh"]

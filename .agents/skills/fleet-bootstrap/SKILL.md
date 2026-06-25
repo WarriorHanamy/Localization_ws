@@ -68,7 +68,7 @@ Any failure before container start reverts the installation.
 | 9 | `docker pull <image>` | Exit 1 |
 | 10 | `docker stop/rm fastlio-runtime` (if exists) | Ignore errors |
 | 11 | `docker run -d ...` (template values from device.yaml) | Exit 1 |
-| 12 | Poll `docker exec ... test -f /tmp/slam_ready` (max 30s) | Print warning + tail logs |
+| 12 | Poll `docker exec ... bash /catkin_ws/src/bringup/scripts/check-l1.sh` (max 90s) | Print warning + tail logs |
 | 13 | Print summary (image, version, container ID, log tail) | |
 
 ## 4. manifest.yaml Schema
@@ -215,17 +215,22 @@ The template lives at `server/artifacts/bootstrap/fastlio.template.sh` in the re
 `fleet-artifacts start` reads the template, replaces `__ARTIFACT_BASE__` with the
 dev-host LAN IP, and writes the result to `install/fastlio` in the serve root.
 
-## 10. Entrypoint Health Signal
+## 10. L1 Smoke Test
 
-The container entrypoint (`docker/entrypoint.sh`) runs a background health poller
-whenever the command is `roslaunch bringup ...`. It polls for the `/Odometry` topic
-(indicating FAST-LIO is producing output) and writes `/tmp/slam_ready`.
+Container readiness is verified by the L1 smoke check script at `/catkin_ws/src/bringup/scripts/check-l1.sh`
+(bind-mounted from the runtime bundle). It validates:
+
+- `/livox/lidar` topic type (`livox_ros_driver2/CustomMsg`) and frequency (>=9 Hz)
+- `/livox/imu` topic type (`sensor_msgs/Imu`) and frequency (>=190 Hz)
 
 The bootstrap script polls via:
 
 ```bash
-docker exec fastlio-runtime test -f /tmp/slam_ready
+docker exec fastlio-runtime bash /catkin_ws/src/bringup/scripts/check-l1.sh
 ```
+
+On failure, the bootstrap script prints the most recent container logs and rolls back to the
+previous release (see §3 step 12).
 
 ## 11. Dev-Host CLI Commands
 

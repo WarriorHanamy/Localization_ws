@@ -49,8 +49,6 @@ RUN sed -i 's|/catkin_ws/devel|/opt/ros/noetic|g' \
     sed -i 's|/catkin_ws/src/livox_ros_driver2|/opt/ros/noetic/share/livox_ros_driver2|g' \
        /opt/ros/noetic/share/livox_ros_driver2/cmake/livox_ros_driver2Config.cmake
 
-# Entrypoint
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+# Base image is infrastructure layer — no entrypoint.
+# Downstream images (prod, calib) declare their own ENTRYPOINT.
 CMD ["bash"]
