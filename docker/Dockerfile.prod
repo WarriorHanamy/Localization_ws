@@ -1,4 +1,4 @@
-FROM nx/lio-base:latest
+FROM lio-base:cuda0.0.0-run-ubuntu20.04-arm64
 
 # Layer 1 — stable SLAM packages (rarely changed)
 COPY ekf_quat_pose/     /catkin_ws/src/ekf_quat_pose/

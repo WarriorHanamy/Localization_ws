@@ -52,7 +52,7 @@ bun run prod status             # works identically
   `$WORKSPACE/logs/{container}.log`. Log rotation is external.
 - **Auto-attach**: Interactive terminal (`process.stdin.isTTY`) → auto-attach after start.
 - **Naming**: Tmux session `prod`, windows `slam` / `topics` / `shell`,
-  container `fastlio-{recipe}`, image `nx/lio-slam:latest`.
+  container `fastlio-{recipe}`, image `lio-slam:cuda0.0.0-run-ubuntu20.04-arm64`.
 - **SSH auto-bridge**: `prod.ts` detects `docker` availability; if absent
   (devel host), it wraps the command in `ssh nv@192.168.55.1` automatically.
 - **Agent commands**: See `docs/AGENT-API.md` for the complete command reference.
@@ -69,8 +69,8 @@ access, viewed remotely via VNC or RustDesk.
 
 ### Docker image lifecycle
 
-`nx/lio-slam:latest` is built **locally** on the dev-device — it is never published
-to Docker Hub. A bare `docker pull nx/lio-slam` will fail (no registry prefix).
+`lio-slam:cuda0.0.0-run-ubuntu20.04-arm64` is built **locally** on the dev-device — it is never published
+to Docker Hub. A bare `docker pull lio-slam` will fail (no registry prefix).
 
 | Stage      | Command                     | Where                       |
 | ---------- | --------------------------- | --------------------------- |
@@ -82,7 +82,8 @@ to Docker Hub. A bare `docker pull nx/lio-slam` will fail (no registry prefix).
 The image only exists on the dev-device's local Docker daemon after `docker-dbuild`.
 For fleet deployment, first start a local registry on the dev-host
 (`bun run registry start`), then push (`bun run docker-push`), then fleet devices
-pull via `docker pull <dev-host-ip>:5000/nx/lio-slam:latest`.
+pull via `docker pull <dev-host-ip>:5000/lio-slam:cuda0.0.0-run-ubuntu20.04-arm64`.
+Docker image references follow `.agents/skills/docker-image-naming/SKILL.md`.
 View fleet distribution status with `bun run status fleet`.
 
 ### CI certification (agent responsibility)

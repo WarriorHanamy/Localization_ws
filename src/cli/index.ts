@@ -37,9 +37,9 @@ Commands:
   doc pipeline [recipe]          open entity-centric recipe pipelines
 
 Docker commands:
-  docker-dbuild              build nx/lio-slam (base → prod) on Jetson (SSH)
-  docker-dbuild base         build nx/lio-base only
-  docker-dbuild calib        build nx/lio-calib (base → calib) on Jetson (SSH)
+  docker-dbuild              build lio-slam runtime image on Jetson (SSH)
+  docker-dbuild base         build lio-base runtime image only
+  docker-dbuild calib        build lio-calib runtime image on Jetson (SSH)
   docker-push        push image to local registry (from golden Jetson)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container

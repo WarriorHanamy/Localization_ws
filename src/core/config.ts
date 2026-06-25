@@ -61,9 +61,10 @@ export const RSYNC_EXCLUDES = [
   "bringup/resource/",
 ] as const;
 
-export const DOCKER_IMAGE_BASE  = "nx/lio-base:latest";
-export const DOCKER_IMAGE_SLAM  = "nx/lio-slam:latest";
-export const DOCKER_IMAGE_CALIB = "nx/lio-calib:latest";
+export const DOCKER_IMAGE_TAG = "cuda0.0.0-run-ubuntu20.04-arm64";
+export const DOCKER_IMAGE_BASE  = `lio-base:${DOCKER_IMAGE_TAG}`;
+export const DOCKER_IMAGE_SLAM  = `lio-slam:${DOCKER_IMAGE_TAG}`;
+export const DOCKER_IMAGE_CALIB = `lio-calib:${DOCKER_IMAGE_TAG}`;
 export const DOCKER_IMAGES = [
   { key: "base", label: "Base", image: DOCKER_IMAGE_BASE },
   { key: "slam", label: "SLAM", image: DOCKER_IMAGE_SLAM },

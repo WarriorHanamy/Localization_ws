@@ -13,7 +13,7 @@ description: Clarify the five runtime entities (dev-host, dev-device, fleet-devi
 | `dev-device`       | Development Jetson (USB-connected)   | `ssh nv@192.168.55.1`, `runSSH(cmd)`           |
 | `fleet-device`     | Production Jetson on aircraft (WiFi) | Self-contained, no external SSH control        |
 | `device-container` | Docker container on any Jetson       | `docker exec <name> bash -c '...'`             |
-| `device-image`     | Docker image (build snapshot)        | `docker run -d --name ... nx/lio-slam:latest` |
+| `device-image`     | Docker image (build snapshot)        | `docker run -d --name ... lio-slam:cuda0.0.0-run-ubuntu20.04-arm64` |
 
 ### `dev-device` vs `fleet-device`
 
@@ -61,7 +61,7 @@ dev-host (src/)  ──rsync──>  dev-device ($REC_DEVICE_LOC_WS/)
                               docker build (snapshot on dev-device)
                                     │
                                     ▼
-                             device-image (nx/lio-slam:latest)
+                             device-image (lio-slam:cuda0.0.0-run-ubuntu20.04-arm64)
                                     │
                               docker run -d --name ...
                                     │
@@ -88,6 +88,8 @@ dev-device ──docker push──>  registry on dev-host (:5443)
 
 Fleet-devices pull the pre-built image and fetch config updates via HTTP tarball.
 No SSH, no rsync, no local docker build.
+
+Docker image references follow `.agents/skills/docker-image-naming/SKILL.md`.
 
 ## 5. Device Container Runtime Infrastructure
 
@@ -177,7 +179,7 @@ log paths exist inside the container, but there is no dev-host SSH bridge.
 | Build Docker image            | `bun run docker-dbuild` (runs on dev-device over SSH)   |
 | Push image to registry        | `bun run docker-push` (from dev-device)                 |
 | Start container (dev)         | `bun run prod <recipe>` (auto-bridges to dev-device)    |
-| Start container (fleet)       | `docker pull <registry>/nx/lio-slam && docker run ...` |
+| Start container (fleet)       | `docker pull <registry>/lio-slam:cuda0.0.0-run-ubuntu20.04-arm64 && docker run ...` |
 | Stop container (dev)          | `bun run prod stop` / `bun run prod reset`              |
 | Shell into container          | `bun run docker-shell <recipe>`                         |
 | List dev-device processes     | `ssh nv@192.168.55.1 'pgrep -af <pattern>'`             |

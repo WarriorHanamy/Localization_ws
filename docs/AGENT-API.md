@@ -66,9 +66,9 @@ bun run prod start  # no recipe → opens fzf menu
 | Action                     | Command                          | What it does                                              |
 | -------------------------- | -------------------------------- | --------------------------------------------------------- |
 | **Sync workspace**         | `bun run sync`                   | rsync local workspace to device                           |
-| **Build SLAM image**       | `bun run docker-dbuild`          | Build `nx/lio-slam` (base → prod) on device via SSH       |
-| **Build base image**       | `bun run docker-dbuild base`     | Build `nx/lio-base` only                                  |
-| **Build calib image**      | `bun run docker-dbuild calib`    | Build `nx/lio-calib` (base → calib) on device via SSH     |
+| **Build SLAM image**       | `bun run docker-dbuild`          | Build `lio-slam:cuda0.0.0-run-ubuntu20.04-arm64` on device via SSH |
+| **Build base image**       | `bun run docker-dbuild base`     | Build `lio-base:cuda0.0.0-run-ubuntu20.04-arm64` only     |
+| **Build calib image**      | `bun run docker-dbuild calib`    | Build `lio-calib:cuda0.0.0-run-ubuntu20.04-arm64`         |
 | **Push to registry**       | `bun run docker-push`            | Tag & push fleet images to local registry from golden Jetson |
 | **Start container**        | `bun run docker-start <recipe>`  | Start a named container for a recipe                     |
 | **Shell into container**   | `bun run docker-shell <recipe>`  | Exec interactive bash into a running container           |
@@ -85,7 +85,7 @@ bun run prod start  # no recipe → opens fzf menu
 | **Fleet status UI** | `bun run status fleet`          | Show status and open the fleet tracker page   |
 
 Registry runs on the devel host. Direct registry port: `5443`; fleet tracker/proxy port: `5000`.
-Fleet clients pull via `docker pull <lan-ip>:5000/nx/lio-slam:latest`.
+Fleet clients pull via `docker pull <lan-ip>:5000/lio-slam:cuda0.0.0-run-ubuntu20.04-arm64`.
 
 ---
 

@@ -8,6 +8,7 @@ import {
 } from "../core/config";
 import { getDevelHostUSBIP, getDevelHostLANIP } from "../core/network";
 import { REGISTRY_CERT } from "../core/registry-paths";
+import { certCovers } from "./registry";
 
 const REMOTE_DOCKER_CERT_DIR = "/etc/docker/certs.d";
 
@@ -50,9 +51,17 @@ export async function cmdDockerPush() {
   }
   const registryPort = REGISTRY_DIRECT_PORT;
   console.log(`[docker-push] Pushing directly to ${registryHost}:${registryPort}`);
+
+  // 3. Verify registry TLS cert covers the push target
+  if (!certCovers([registryHost])) {
+    console.log(`[docker-push] Registry cert on dev-host does not cover push target ${registryHost}.`);
+    console.log(`[docker-push] Run 'bun run registry start' to regenerate the cert, then retry.`);
+    process.exit(1);
+  }
+
   await installRegistryTrust(registryHost, registryPort);
 
-  // 3. Verify images exist on Jetson
+  // 4. Verify images exist on Jetson
   const checkCmd = [
     "set -euo pipefail",
     ...DOCKER_IMAGES.map(({ image }) => `docker image inspect ${$.escape(image)} >/dev/null`),
@@ -68,7 +77,7 @@ export async function cmdDockerPush() {
     process.exit(1);
   }
 
-  // 4. Tag and push (direct to registry, bypassing tracker proxy)
+  // 5. Tag and push (direct to registry, bypassing tracker proxy)
   const pushCmd = [
     "set -euo pipefail",
     ...DOCKER_IMAGES.flatMap(({ image }) => {

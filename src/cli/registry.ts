@@ -5,7 +5,7 @@ import {
   DOCKER_REGISTRY_IMAGE,
 } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
-import { getDevelHostLANIP, getDevelHostUSBIP } from "../core/network";
+import { getDevelHostLANIP, getAllHostUSBIPs } from "../core/network";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from "fs";
 import { join } from "path";
 import {
@@ -33,10 +33,10 @@ function dockerCertMount(): string {
 }
 
 function registryIPs(): string[] {
-  return [...new Set(["127.0.0.1", getDevelHostLANIP(), getDevelHostUSBIP()].filter(Boolean) as string[])];
+  return [...new Set(["127.0.0.1", getDevelHostLANIP(), ...getAllHostUSBIPs()].filter(Boolean) as string[])];
 }
 
-function certCovers(ips: string[]): boolean {
+export function certCovers(ips: string[]): boolean {
   if (!existsSync(REGISTRY_CERT) || !existsSync(REGISTRY_KEY)) return false;
   const proc = Bun.spawnSync(["openssl", "x509", "-in", REGISTRY_CERT, "-noout", "-ext", "subjectAltName"]);
   if (proc.exitCode !== 0) return false;

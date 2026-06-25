@@ -204,9 +204,9 @@ function renderPullScript(status) {
   const fleet = status.endpoints.fleet || "http://<dev-host-ip>:5000";
   const registry = fleet.replace(/^https?:\/\//, "");
   const images = status.images || [
-    { label: "Base", image: "nx/lio-base:latest" },
-    { label: "SLAM", image: "nx/lio-slam:latest" },
-    { label: "Calib", image: "nx/lio-calib:latest" },
+    { label: "Base", image: "lio-base:cuda0.0.0-run-ubuntu20.04-arm64" },
+    { label: "SLAM", image: "lio-slam:cuda0.0.0-run-ubuntu20.04-arm64" },
+    { label: "Calib", image: "lio-calib:cuda0.0.0-run-ubuntu20.04-arm64" },
   ];
   PULLSCRIPTS.innerHTML = images.map((item, index) => {
     const script = scriptForImage(registry, item.image);
