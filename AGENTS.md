@@ -36,7 +36,7 @@ bun run prod attach             # attach to tmux session
 bun run prod status             # show status
 ```
 
-**Usage (from devel-host) — same commands, auto-bridge:**
+**Usage (from dev-host) — same commands, auto-bridge:**
 
 ```bash
 bun run prod slam               # auto-SSH to device, no manual wrapping

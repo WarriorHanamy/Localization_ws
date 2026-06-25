@@ -1,7 +1,7 @@
 import { LAN_HOST } from "./config";
 
 /**
- * IPv4 of the devel-host on the USB RNDIS link (reachable from golden Jetson).
+ * IPv4 of the dev-host on the USB RNDIS link (reachable from dev-device).
  */
 export function getDevelHostUSBIP(): string | null {
   const proc = Bun.spawnSync(["ip", "route", "get", "192.168.55.1"]);
@@ -11,7 +11,7 @@ export function getDevelHostUSBIP(): string | null {
 }
 
 /**
- * IPv4 of the devel-host on the fleet LAN.
+ * IPv4 of the dev-host on the fleet LAN.
  *
  * Fleet devices share the Diff* Wi-Fi network, so prefer an active wireless
  * default route over a lower-metric wired route. The explicit environment

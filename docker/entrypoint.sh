@@ -2,7 +2,10 @@
 set -e
 
 source /opt/ros/noetic/setup.bash
-source /catkin_ws/devel/setup.bash
+if [[ -f /catkin_ws/devel/setup.bash ]]; then
+    source /catkin_ws/devel/setup.bash
+fi
+export ROS_PACKAGE_PATH=/catkin_ws/src:$ROS_PACKAGE_PATH
 
 if ! rostopic list >/dev/null 2>&1; then
   roscore &

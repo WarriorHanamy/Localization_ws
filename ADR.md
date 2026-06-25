@@ -5,14 +5,14 @@
 **Status:** Accepted
 
 **Context:** Smoke tests like `bun run smoke fov` require human visual inspection
-of RVIZ point cloud display on the Jetson from the devel-host, with full mouse
+of RVIZ point cloud display on the Jetson from the dev-host, with full mouse
 interaction (rotate, zoom, select). The rendering pipeline determines how 3D
 content reaches the user's screen.
 
 **Decision:** NoMachine (`nxplayer` → Jetson display :0)
 
 RVIZ runs natively on the Jetson display `:0` with the Jetson GPU. The
-devel-host connects to the physical desktop through NoMachine over the USB
+dev-host connects to the physical desktop through NoMachine over the USB
 link (`192.168.55.1:4000`). `bun run smoke fov` and `bun run rviz` require the
 NoMachine client; VNC is not an automatic fallback because its point-cloud
 interaction and frame rate are insufficient for this smoke test.
@@ -29,7 +29,7 @@ to their compositor.
 | SSH X11 forwarding   | 3D GLX over X11 tunnel is extremely slow for dense point clouds  |
 | VNC (`gvncviewer`)   | Functional but too slow for interactive dense point clouds       |
 | RustDesk             | Works but requires daemon + local relay server, heavier setup    |
-| Web (rosbridge +     | Ideal architecture (more rendering on devel-host GPU), but not   |
+| Web (rosbridge +     | Ideal architecture (more rendering on dev-host GPU), but not   |
 | three.js)            | ready yet — frontend needs multi-topic PointCloud2 display       |
 | Virtual framebuffer  | Xvfb + x11vnc adds complexity; physical :0 is simpler            |
 
@@ -39,7 +39,7 @@ to their compositor.
 - Devel-host needs `/usr/NX/bin/nxplayer`; on Arch install `nomachine` from AUR
 - The first connection targets `192.168.55.1:4000`; save its `.nxs` profile
 - `NOMACHINE_SESSION` can select an explicit `.nxs` profile
-- Smoke command auto-launches NoMachine on devel-host + tmux logs in terminal
+- Smoke command auto-launches NoMachine on dev-host + tmux logs in terminal
 - Arch + Wayland + Hyprland routes new NoMachine viewers to workspace 9
 - ROS topics are shared via `--network host` Docker container
 
@@ -68,11 +68,11 @@ scale:
    `.docker-sdk/` from `/usr/local/`), never at runtime.
 
 The distribution network is a shared Diff* WiFi LAN where all aircrafts and the
-devel-host coexist.
+dev-host coexist.
 
 **Decision:**
 
-Layered delivery with the devel-host as a local distribution hub.
+Layered delivery with the dev-host as a local distribution hub.
 
 | Layer                    | Carrier        | Change Freq | Delivery            |
 | ------------------------ | -------------- | ----------- | ------------------- |
@@ -81,7 +81,7 @@ Layered delivery with the devel-host as a local distribution hub.
 | Livox SDK2 binaries      | (inside image) | Very low    | Excluded from rsync |
 
 **Docker Registry (port 5000)** — A golden Jetson builds the image once via
-`docker build` and pushes to a local `registry:2` container on the devel-host.
+`docker build` and pushes to a local `registry:2` container on the dev-host.
 All 50+ aircrafts pull concurrently over the LAN. Docker layer caching means a
 typical code-only update transfers only the changed layers (10-100 MB), not the
 full image.
@@ -108,7 +108,7 @@ Jetson (where they are staged from the device's `/usr/local/` into
 **Distribution workflow:**
 
 ```
-[Golden Jetson]              [Devel-host LAN IP]            [50+ Aircrafts]
+[Dev Device]                [Dev-host LAN IP]              [50+ Fleet Devices]
                               ┌──────────────┐
 docker build / push ────────► │ registry:2   │ ◄─────────── docker pull
                               │ port 5000    │
@@ -130,9 +130,9 @@ bringup/ tarball ───────────► │ HTTP server  │ ◄�
 | NFS runtime mount         | LAN dependency in flight, single point of failure      |
 
 **Consequences:**
-- `devel-host` must open UFW ports 5000 (registry) and 8080 (bringup tarball)
+- `dev-host` must open UFW ports 5000 (registry) and 8080 (bringup tarball)
 - Each aircraft's Docker daemon needs
-  `insecure-registries: ["<devel-host-lan-ip>:5000"]`
+  `insecure-registries: ["<dev-host-lan-ip>:5000"]`
 - A `bun run docker-push` CLI command is needed for image push workflow
 - A `bun run fleet-deploy` CLI command should generate the aircraft-side
   bootstrap script (`docker pull` + `wget` + `docker run`)

@@ -11,7 +11,7 @@ import { fileURLToPath } from "url";
 
 const LOG_FILE = join(getRepoRoot(), TRACKER_LOG);
 const HTML_FILE = join(dirname(fileURLToPath(import.meta.url)), "tracker.html");
-const UPSTREAM = `http://127.0.0.1:${REGISTRY_INTERNAL_PORT}`;
+const UPSTREAM = `https://127.0.0.1:${REGISTRY_INTERNAL_PORT}`;
 const UPSTREAM_HOST = `127.0.0.1:${REGISTRY_INTERNAL_PORT}`;
 
 interface PullEntry {

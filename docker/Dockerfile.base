@@ -36,14 +36,16 @@ COPY .docker-sdk/livox_sdk2/lib/     /usr/local/lib/
 COPY .docker-sdk/livox_sdk2/include/ /usr/local/include/
 RUN ldconfig
 
-# Catkin workspace
-RUN mkdir -p /catkin_ws/src
-
-# Livox driver (single stable layer)
-COPY livox_ros_driver2/ /catkin_ws/src/livox_ros_driver2/
-RUN . /opt/ros/noetic/setup.sh && \
-    cd /catkin_ws && \
-    catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release
+# Livox driver — pre-built, staged in bringup/resource/ (same pattern as SDK2)
+COPY bringup/resource/livox_ros_driver2/lib/     /opt/ros/noetic/lib/livox_ros_driver2/
+COPY bringup/resource/livox_ros_driver2/include/ /opt/ros/noetic/include/
+COPY bringup/resource/livox_ros_driver2/share/   /opt/ros/noetic/share/livox_ros_driver2/
+COPY bringup/resource/livox_ros_driver2/python/  /opt/ros/noetic/lib/python3/dist-packages/livox_ros_driver2/
+# Fix cmake config paths (devel-space → install-space)
+RUN sed -i 's|/catkin_ws/devel|/opt/ros/noetic|g' \
+       /opt/ros/noetic/share/livox_ros_driver2/cmake/livox_ros_driver2Config.cmake && \
+    sed -i 's|/catkin_ws/src/livox_ros_driver2|/opt/ros/noetic/share/livox_ros_driver2|g' \
+       /opt/ros/noetic/share/livox_ros_driver2/cmake/livox_ros_driver2Config.cmake
 
 # Entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh

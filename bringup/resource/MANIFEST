@@ -1,0 +1,20 @@
+# bringup/resource MANIFEST
+# Maps resource paths to absolute container destination paths.
+# Format: <resource_path>  <container_path>
+#   resource_path   relative to bringup/resource/
+#   container_path  absolute path inside the Docker image
+#   Trailing / on both sides: directory copy (recursive, merge)
+#   Trailing / on container side only: file copied into directory
+
+# ── Livox SDK2 ───────────────────────────────────────────────────────────────
+livox_sdk2/liblivox_lidar_sdk_static.a   /usr/local/lib/liblivox_lidar_sdk_static.a
+livox_sdk2/liblivox_lidar_sdk_shared.so  /usr/local/lib/liblivox_lidar_sdk_shared.so
+livox_sdk2/livox_lidar_api.h             /usr/local/include/livox_lidar_api.h
+livox_sdk2/livox_lidar_cfg.h             /usr/local/include/livox_lidar_cfg.h
+livox_sdk2/livox_lidar_def.h             /usr/local/include/livox_lidar_def.h
+
+# ── livox_ros_driver2 ───────────────────────────────────────────────────────
+livox_ros_driver2/lib/                    /opt/ros/noetic/lib/livox_ros_driver2/
+livox_ros_driver2/include/                /opt/ros/noetic/include/livox_ros_driver2/
+livox_ros_driver2/share/                  /opt/ros/noetic/share/livox_ros_driver2/
+livox_ros_driver2/python/                 /opt/ros/noetic/lib/python3/dist-packages/livox_ros_driver2/

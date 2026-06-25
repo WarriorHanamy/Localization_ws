@@ -10,17 +10,17 @@ import { getDevelHostUSBIP, getDevelHostLANIP } from "../core/network";
 export async function cmdDockerPush() {
   console.log("[docker-push] Pushing fastlio-jetson to registry ...");
 
-  // 1. Check SSH to golden Jetson
+  // 1. Check SSH to dev-device
   const ok = await checkSSH();
   if (!ok) {
-    console.log("[docker-push] Golden Jetson not reachable via USB. Is it connected?");
+    console.log("[docker-push] Dev device not reachable via USB. Is it connected?");
     process.exit(1);
   }
 
-  // 2. Detect devel-host USB IP (push bypasses proxy, connects directly to registry)
+  // 2. Detect dev-host USB IP (push bypasses proxy, connects directly to registry)
   const usbIP = getDevelHostUSBIP();
   if (!usbIP) {
-    console.log("[docker-push] Cannot detect devel-host USB IP. Is the Jetson connected?");
+    console.log("[docker-push] Cannot detect dev-host USB IP. Is the Jetson connected?");
     process.exit(1);
   }
   const registryHost = usbIP;
@@ -56,5 +56,5 @@ export async function cmdDockerPush() {
   console.log("[docker-push] Image pushed successfully.");
   const lanIP = getDevelHostLANIP();
   const pullHost = lanIP || registryHost;
-  console.log(`[docker-push] Fleet aircrafts: docker pull ${pullHost}:${REGISTRY_PORT}/${DOCKER_IMAGE}`);
+  console.log(`[docker-push] Fleet devices: docker pull ${pullHost}:${REGISTRY_PORT}/${DOCKER_IMAGE}`);
 }

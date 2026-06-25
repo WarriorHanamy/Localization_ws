@@ -4,37 +4,50 @@
 
 ```
 ┌─────────────────────┐     USB/RNDIS      ┌─────────────────────┐     docker     ┌──────────────────┐
-│   Devel Host         │ ◄──────────────►  │   Device Host        │ ◄──────────►  │   Container        │
-│   (x86_64 Linux)     │    192.168.55.100  │   (Jetson Orin NX     │               │   (fastlio-jetson)   │
-│                     │         SSH        │    aarch64 Linux)    │               │   ROS noetic        │
-│                     │                    │                      │               │                     │
-│  Bun 开发工具链      │                    │  Bun 生产编排         │               │  - FAST-LIO         │
-│  - sync / build     │                    │  - prod start        │               │  - livox_ros_driver2│
-│  - check / smoke    │                    │  - prod stop / reset │               │  - bringup (bind)   │
-│  - rviz / dashboard │                    │  - prod attach       │               │                     │
-│  - docker-*         │                    │  - prod status       │               └──────────────────┘
+│   Dev Host            │ ◄──────────────►  │   Dev Device          │ ◄──────────►  │   Device Container  │
+│   (x86_64 Linux)      │    192.168.55.x    │   (Jetson Orin NX     │               │   (fastlio-jetson)   │
+│                      │         SSH         │    aarch64 Linux)    │               │   ROS noetic        │
+│                      │                    │                      │               │                     │
+│  Bun 开发工具链       │                    │  Bun 生产编排         │               │  - FAST-LIO         │
+│  - sync / build      │                    │  - prod start         │               │  - livox_ros_driver2│
+│  - check / smoke     │                    │  - prod stop / reset  │               │  - bringup (bind)   │
+│  - rviz / dashboard  │                    │  - prod attach        │               │                     │
+│  - docker-*          │                    │  - prod status        │               └──────────────────┘
+│  - registry          │                    │                      │
+└─────────────────────┘                    └──────────────────────┘
+
+┌─────────────────────┐     WiFi LAN        ┌──────────────────────┐
+│   Registry + HTTP    │ ◄──────────────►   │   Fleet Device (×N)   │
+│   (on dev-host)      │  pull image +      │   (Jetson Orin NX     │
+│   :5000 :8080        │  wget tarball      │    aarch64 Linux)     │
+│                      │                    │                       │
+│  registry:2          │                    │  Autonomous runtime   │
+│  tracker (bun)       │                    │  - docker pull        │
+│  python http.server  │                    │  - docker run         │
 └─────────────────────┘                    └──────────────────────┘
 ```
 
-Bun is installed on **both** the devel host and the device host, with distinct roles:
+Bun is installed on **both** the dev host and the dev device, with distinct roles:
 
 | Location   | Bun Role                | Commands                                                   |
 | ---------- | ----------------------- | ---------------------------------------------------------- |
-| Devel host | Development toolchain   | `sync`, `build`, `check`, `smoke`, `rviz`, `dashboard`, `docker-*` |
-| Device host| Production orchestration | `prod start <recipe>`, `prod stop`, `prod reset`, `prod attach`, `prod status` |
+| Dev host   | Development toolchain   | `sync`, `build`, `check`, `smoke`, `rviz`, `dashboard`, `docker-*`, `registry` |
+| Dev device | Production orchestration | `prod start <recipe>`, `prod stop`, `prod reset`, `prod attach`, `prod status` |
 
-**Sync** is one-directional: devel host pushes code changes to the device via `bun run sync`.
+Fleet devices have **no Bun runtime** — they operate standalone via `docker pull` + `wget`.
+
+**Sync** is one-directional: dev host pushes code changes to the dev device via `bun run sync`.
 
 **All `bun run prod` commands work identically on both hosts.**
 The TypeScript CLI (`src/cli/prod.ts`) auto-detects the host: if `docker` is not available
-locally, it tunnels via SSH. The production orchestration always executes on the device host.
+locally, it tunnels via SSH. The production orchestration always executes on the dev device.
 
 ---
 
 ## User Workflow
 
 The same `bun run prod` commands work on both hosts — `prod.ts` auto-bridges via SSH
-when invoked from the devel host.
+when invoked from the dev host.
 
 ### One Script to Start All Services (reset first)
 
@@ -76,10 +89,10 @@ Kills everything unconditionally:
 
 ---
 
-## Agent Workflow (Devel Host)
+## Agent Workflow (Dev Host)
 
-The agent runs exclusively on the devel host. All standard CLI commands work directly.
-`bun run prod` auto-detects the devel host and tunnels via SSH.
+The agent runs exclusively on the dev host. All standard CLI commands work directly.
+`bun run prod` auto-detects the dev host and tunnels via SSH to the dev device.
 For a complete reference of all agent-accessible commands, see `docs/AGENT-API.md`.
 
 ### Log System (Reliability Guarantees)
@@ -175,11 +188,11 @@ src/
 - **Bun-native orchestration**: Zero bash in the production pipeline. `bun run prod`
   uses `Bun.spawnSync` to drive docker and tmux directly.
 
-- **Workspace sync is the deploy mechanism**: `bun run sync` pushes the entire workspace
-  to the device. Bun runtime is the only pre-installed dependency on the device.
+- **Workspace sync is the dev deploy mechanism**: `bun run sync` pushes the entire workspace
+  to the dev device. Fleet devices receive configs via HTTP tarball.
 
 - **Convenience wrappers**: The `bin/prod` wrapper and `completions/prod.bash` completion
-  are synced with the workspace. On the device, add to `.bashrc` for TAB completion and
+  are synced with the workspace. On the dev device, add to `.bashrc` for TAB completion and
   `prod` command at the terminal:
 
   ```bash
@@ -189,15 +202,15 @@ src/
 
 ---
 
-## Data Flow (Full Lifecycle)
+## Data Flow (Development)
 
 ```
-  Devel Host                          Device Host                             Container
+  Dev Host                             Dev Device                              Container
      │                                    │                                      │
      ├── bun run sync ──── rsync ───────► │                                      │
      │                                    │                                      │
 │  <any host: bun run prod start <recipe>'     │                                      │
-│  devel auto-bridges via SSH ──────────────►  │                                      │
+│  dev host auto-bridges via SSH ──────────►  │                                      │
      │                                    ├── docker stop / rm (stale)           │
      │                                    ├── docker run -d ──────────────────►  │
      │                                    │     --name fastlio-{recipe}          │
@@ -217,6 +230,26 @@ src/
      │                                    ├── docker stop / rm                  │
      │                                    ├── pkill livox / roslaunch           │
      │                                    │                                      │
+```
+
+## Data Flow (Fleet Distribution)
+
+```
+  Dev Device                    Dev Host Registry                Fleet Device (×N)
+     │                               │                                │
+     ├── docker push ──────────────► │                                │
+     │     fastlio-jetson:latest      │                                │
+     │                               ├── registry:2 (:5050)          │
+     │                               ├── tracker proxy (:5000)       │
+     │                               ├── python http.server (:8080)  │
+     │                               │                                │
+     │                               │ ◄──── docker pull :5000 ──────┤
+     │                               │ ◄──── wget bringup.tar ───────┤
+     │                               │                                │
+     │                               │                          docker run -d
+     │                               │                          --name fastlio-{recipe}
+     │                               │                          roslaunch bringup {launch}
+     │                               │                                │
 ```
 
 ---

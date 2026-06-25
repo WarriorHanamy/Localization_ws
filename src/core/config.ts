@@ -22,7 +22,7 @@ export const WORKSPACE_PKGS = [
 
 // Registry and fleet distribution
 export const REGISTRY_PORT = 5000;          // Public proxy port (pull through tracker)
-export const REGISTRY_DIRECT_PORT = 5050;   // Direct registry port (push from golden Jetson)
+export const REGISTRY_DIRECT_PORT = 5443;   // Direct registry port (push from dev-device)
 export const REGISTRY_INTERNAL_PORT = REGISTRY_DIRECT_PORT; // Tracker upstream port
 export const DOCKER_REGISTRY_IMAGE = "registry:2";
 export const TRACKER_LOG = "logs/registry-pulls.json";

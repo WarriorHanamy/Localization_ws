@@ -11,6 +11,9 @@ import { join } from "path";
 
 const CONTAINER = "loc-registry";
 const PID_FILE = join(getRepoRoot(), "logs", "tracker.pid");
+const CERT_DIR = "/etc/docker/registry/certs";
+const CONFIG_FILE = "/etc/docker/registry/config.yml";
+const DATA_VOLUME = `${CONTAINER}-data`;
 
 function dockerPs(filter: string): string {
   const proc = Bun.spawnSync(["docker", "ps", "-q", "--filter", filter]);
@@ -24,9 +27,20 @@ async function doStart() {
     console.log(`[registry] ${CONTAINER} already running (${existing.slice(0, 12)})`);
   } else {
     console.log(`[registry] Starting ${CONTAINER} on 0.0.0.0:${REGISTRY_DIRECT_PORT} ...`);
+    // Ensure data volume exists
+    const volCheck = Bun.spawnSync(["docker", "volume", "inspect", DATA_VOLUME], { stdio: "pipe" });
+    if (volCheck.exitCode !== 0) {
+      const volCreated = Bun.spawnSync(["docker", "volume", "create", DATA_VOLUME]);
+      if (volCreated.exitCode !== 0) {
+        throw new Error(`Failed to create volume ${DATA_VOLUME}`);
+      }
+    }
     const proc = Bun.spawnSync([
       "docker", "run", "-d", "--restart=always",
       "--name", CONTAINER,
+      "-v", `${DATA_VOLUME}:/var/lib/registry`,
+      "-v", `${CONFIG_FILE}:/etc/docker/registry/config.yml:ro`,
+      "-v", `${CERT_DIR}:/certs:ro`,
       "-p", `${REGISTRY_DIRECT_PORT}:5000`,
       DOCKER_REGISTRY_IMAGE,
     ], { stdio: ["inherit", "inherit", "inherit"] as const });
@@ -51,7 +65,7 @@ async function doStart() {
 
   const proc = Bun.spawn(["bun", "src/web/tracker-server.ts"], {
     stdio: ["ignore", "inherit", "inherit"] as const,
-    env: { ...process.env },
+    env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: "0" },
   });
   writeFileSync(PID_FILE, String(proc.pid));
   console.log(`[registry] Tracker started (pid ${proc.pid})`);
@@ -111,8 +125,9 @@ function doStatus() {
 function printInfo() {
   const lanIP = getDevelHostLANIP();
   if (lanIP) {
-    console.log(`\n  Registry:  ${lanIP}:${REGISTRY_PORT}`);
-    console.log(`  Tracker:   http://${lanIP}:${REGISTRY_PORT}/tracker`);
+    console.log(`\n  Registry:   https://${lanIP}:${REGISTRY_DIRECT_PORT}`);
+    console.log(`  Proxy:      http://${lanIP}:${REGISTRY_PORT}`);
+    console.log(`  Tracker:    http://${lanIP}:${REGISTRY_PORT}/tracker`);
   }
 }
 
