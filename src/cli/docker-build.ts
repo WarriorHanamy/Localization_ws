@@ -28,14 +28,6 @@ async function buildTarget(target: string): Promise<void> {
 }
 
 export async function cmdDockerBuild(target?: string): Promise<void> {
-  const effective = target ?? "slam";
-  const cfg = TARGETS[effective];
-  if (!cfg) {
-    console.error(`[docker-build] Unknown target: ${target}`);
-    console.error(`  Options: ${Object.keys(TARGETS).join(", ")}`);
-    process.exit(1);
-  }
-
   const ok = await checkSSH();
   if (!ok) {
     console.log("[docker-build] SSH check failed. Run 'bun run sync' first.");
@@ -54,9 +46,20 @@ export async function cmdDockerBuild(target?: string): Promise<void> {
   }
   console.log(`[docker-build] bringup/resource/ synced.`);
 
-  // Build dependency chain
-  if (cfg.depends) {
-    await buildTarget(cfg.depends);
+  if (target) {
+    const cfg = TARGETS[target];
+    if (!cfg) {
+      console.error(`[docker-build] Unknown target: ${target}`);
+      console.error(`  Options: ${Object.keys(TARGETS).join(", ")}`);
+      process.exit(1);
+    }
+    if (cfg.depends) {
+      await buildTarget(cfg.depends);
+    }
+    await buildTarget(target);
+  } else {
+    await buildTarget("base");
+    await buildTarget("slam");
+    await buildTarget("calib");
   }
-  await buildTarget(effective);
 }

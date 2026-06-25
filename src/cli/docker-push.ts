@@ -73,7 +73,7 @@ export async function cmdDockerPush() {
     for (const { label, image } of DOCKER_IMAGES) {
       console.log(`  ${label.padEnd(5)} ${image}`);
     }
-    console.log("[docker-push] Run 'bun run docker-dbuild' and 'bun run docker-dbuild calib' first.");
+    console.log("[docker-push] Run 'bun run docker-dbuild' first.");
     process.exit(1);
   }
 

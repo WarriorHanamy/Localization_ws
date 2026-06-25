@@ -211,9 +211,10 @@ Dockerfile.base ─┬─→ Dockerfile.prod (SLAM)
 | `fastlio-jetson`   | `Dockerfile.prod`     | ekf, incr_map, FAST_LIO, bringup       | Frequent        |
 | `fastlio-calib`    | `Dockerfile.calib`    | Ceres, LiDAR_IMU_Init                   | Rare            |
 
-`bun run docker-dbuild` builds base (cached) then SLAM.
-`bun run docker-dbuild calib` builds base (cached) then calib.
+`bun run docker-dbuild` builds all three: base → slam → calib.
 `bun run docker-dbuild base` builds base only.
+`bun run docker-dbuild slam` builds slam only.
+`bun run docker-dbuild calib` builds calib only.
 
 **Consequences:**
 - Three tags in local Docker registry instead of two

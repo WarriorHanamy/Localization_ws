@@ -1,6 +1,6 @@
 ---
 name: setup-runtime
-description: Use when installing or verifying application runtime dependencies on the Jetson device: Bun, fzf, workspace PATH, bash completion for `prod`. Triggers when user mentions "setup runtime", "install application deps", "configure prod environment", "setup bun on device", or "install dependencies for Localization_ws".
+description: Use when installing or verifying application runtime dependencies on the Jetson device: Bun, fzf, workspace PATH, bash completion for `bun run`. Triggers when user mentions "setup runtime", "install application deps", "configure prod environment", "setup bun on device", or "install dependencies for Localization_ws".
 ---
 
 # Setup Runtime
@@ -44,7 +44,12 @@ ssh nv@192.168.55.1 "~/.bun/bin/bun --version"
 
 Expected output: `1.x.x` (should be >= 1.1.0 for aarch64 support).
 
-### 3. Create system-wide symlink
+### 3. Verify SQLite compatibility
+
+Bun bundles `bun:sqlite` natively, so no separate SQLite installation is needed.
+The completion history database is auto-created at `~/.local/state/l10n/completions.db`.
+
+### 5. Create system-wide symlink
 
 Non-interactive SSH commands (`ssh host command`) do not source `.bashrc` or `.profile`,
 so `bun` must be available in a standard PATH location.
@@ -61,7 +66,7 @@ ssh nv@192.168.55.1 "bun --version"
 
 Must output the same version without sourcing any profile.
 
-### 4. Configure workspace PATH
+### 6. Configure workspace PATH
 
 Add `Localization_ws/bin/` (the `prod` wrapper) to PATH so `prod start`,
 `prod reset`, etc. work from any directory.
@@ -72,13 +77,13 @@ to paste these three lines into both `~/.bashrc` and `~/.profile`:
 ```bash
 export LOCALIZATION_DEVICE_HOST=1
 export PATH="$HOME/Localization_ws/bin:$PATH"
-source "$HOME/Localization_ws/completions/prod.bash" 2>/dev/null
+source "$HOME/Localization_ws/completions/bun-localization.bash" 2>/dev/null
 ```
 
 `LOCALIZATION_DEVICE_HOST` is required by `prod.ts` to auto-detect the device host
 so it can SSH-bridge from the devel host correctly.
 
-**4.1 Append to `~/.bashrc`** (interactive login shells):
+**6.1 Append to `~/.bashrc`** (interactive login shells):
 
 ```bash
 ssh nv@192.168.55.1 'bash -lc '\''
@@ -87,12 +92,12 @@ for f in ~/.bashrc ~/.profile; do
   echo "# Localization_ws convenience" >> "$f"
   echo "export LOCALIZATION_DEVICE_HOST=1" >> "$f"
   echo "export PATH=\"\$HOME/Localization_ws/bin:\$PATH\"" >> "$f"
-  echo "source \"\$HOME/Localization_ws/completions/prod.bash\" 2>/dev/null" >> "$f"
+  echo "source \"\$HOME/Localization_ws/completions/bun-localization.bash\" 2>/dev/null" >> "$f"
 done
 '\'''
 ```
 
-### 5. Source the changes
+### 7. Source the changes
 
 For the current session, source the profile:
 
@@ -112,7 +117,7 @@ Next login will automatically pick up the changes.
 | `prod` in PATH | `ssh nv@192.168.55.1 "bash -lc 'which prod'"` | `/home/nv/Localization_ws/bin/prod` |
 | Device host marker | `ssh nv@192.168.55.1 "bash -lc 'echo \$LOCALIZATION_DEVICE_HOST'"` | `1` |
 | `prod` help | `ssh nv@192.168.55.1 "bash -lc 'prod --help'"` | Shows usage with recipes |
-| `prod` completion | `ssh nv@192.168.55.1 "bash -lc 'type _prod_completion'"` | `_prod_completion is a function` |
+| `bun run` completion | `ssh nv@192.168.55.1 "bash -lc 'type _bun_run_complete'"` | `_bun_run_complete is a function` |
 | `--list-recipes` | `ssh nv@192.168.55.1 "bash -lc 'prod --list-recipes'"` | Space-separated recipe names |
 | Runtime status | `ssh nv@192.168.55.1 "bash -lc 'prod status'"` | tmux + docker + logs output |
 
@@ -126,7 +131,7 @@ Next login will automatically pick up the changes.
 | `fzf: command not found` | Not installed | Run step 1; `sudo apt-get install -y fzf` |
 | `--list-recipes` returns nothing | Workspace not synced | Run `bun run sync` from devel machine |
 | `Illegal instruction (core dumped)` on older ARM CPUs | LSE atomics issue | Update Bun to >= v1.3.9 (has `-moutline-atomics` fix) |
-| TAB completion not working in interactive shell | Completion file not sourced | Verify `source ~/Localization_ws/completions/prod.bash` is in `~/.bashrc` and `~/.profile` |
+| TAB completion not working in interactive shell | Completion file not sourced | Verify `source ~/Localization_ws/completions/bun-localization.bash` is in `~/.bashrc` and `~/.profile` |
 
 ## Related
 

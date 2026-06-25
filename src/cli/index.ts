@@ -14,8 +14,33 @@ import { cmdRegistry } from "./registry";
 import { cmdProd } from "./prod";
 import { cmdDoc } from "./doc";
 import { cmdStatus } from "./status";
-import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES } from "../core/config";
+import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES, RELEASE_CONFIGS, DOCKER_IMAGES } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
+import { logCompletion, listCompletions } from "../core/completions-db";
+
+const COMPLETION_DEFAULTS: Record<string, () => string[]> = {
+  command: () => [
+    "sync", "check", "paths", "rviz", "source",
+    "dashboard", "dev", "smoke", "doc", "status",
+    "docker-dbuild", "docker-push", "docker-start",
+    "docker-shell", "fleet-bundle", "fleet-artifacts",
+    "registry", "prod", "help",
+  ],
+  prod: () => ["slam", "slam-map", "reloc", "start", "stop", "reset", "attach", "status"],
+  smoke: () => [
+    "l1-livox", "l1-mavros", "l2-slam-livox", "l2-slam-mavros",
+    "l2-fov-livox", "l2-fov-mavros", "l2-calib", "l2-eval",
+  ],
+  "docker-dbuild": () => DOCKER_IMAGES.map((d) => d.key),
+  "fleet-bundle": () => [...RELEASE_CONFIGS],
+  "fleet-artifacts": () => ["start", "stop", "status"],
+  registry: () => ["start", "stop", "status"],
+  doc: () => ["codebase", "pipeline"],
+  "doc:pipeline": () => Object.keys(RECIPES).sort(),
+  status: () => ["fleet"],
+  rviz: () => ["fast-lio", "livox"],
+  recipe: () => Object.keys(RECIPES).sort(),
+};
 
 const USAGE = `
 Usage: bun run <command> [args]
@@ -39,9 +64,10 @@ Commands:
   doc pipeline [recipe]          open entity-centric recipe pipelines
 
 Docker commands:
-  docker-dbuild              build lio-slam runtime image on Jetson (SSH)
+  docker-dbuild              build all runtime images on Jetson (SSH)
   docker-dbuild base         build lio-base runtime image only
-  docker-dbuild calib        build lio-calib runtime image on Jetson (SSH)
+  docker-dbuild slam         build lio-slam runtime image only
+  docker-dbuild calib        build lio-calib runtime image only
   docker-push        push image to local registry (from golden Jetson)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
@@ -90,7 +116,46 @@ async function cmdPaths(): Promise<void> {
 const CMD = process.argv[2];
 const args = process.argv.slice(3);
 
+async function cmdCompletionsLog(): Promise<void> {
+  const context = args[0];
+  const value = args[1];
+  if (!context || !value) {
+    console.error("Usage: completions-log <context> <value>");
+    process.exit(1);
+  }
+  logCompletion(context, value);
+}
+
+async function cmdCompletionsList(): Promise<void> {
+  const context = args[0];
+  if (!context) {
+    console.error("Usage: completions-list <context>");
+    process.exit(1);
+  }
+  const getDefaults = COMPLETION_DEFAULTS[context];
+  if (!getDefaults) {
+    console.error(`[completions] unknown context: ${context}`);
+    process.exit(1);
+  }
+  const sorted = listCompletions(context, getDefaults());
+  for (const item of sorted) console.log(item);
+}
+
+function recordInvocation(): void {
+  if (!CMD || CMD.startsWith("completions-")) return;
+  logCompletion("command", CMD);
+  if (args.length === 0) return;
+  const subCtxs = new Set(["prod", "smoke", "docker-dbuild", "fleet-artifacts", "registry", "doc", "status", "rviz"]);
+  if (subCtxs.has(CMD)) logCompletion(CMD, args[0]);
+  if (["docker-start", "docker-shell"].includes(CMD)) logCompletion("recipe", args[0]);
+  if (CMD === "fleet-bundle") logCompletion("fleet-bundle", args[0]);
+  if (CMD === "doc" && args[0] === "pipeline" && args[1]) logCompletion("recipe", args[1]);
+  if (CMD === "prod" && (args[0] === "start" || args[0] === "slam" || args[0] === "slam-map" || args[0] === "reloc") && args[1]) logCompletion("recipe", args[1]);
+}
+
 async function main() {
+  recordInvocation();
+
   switch (CMD) {
     case "sync":
       await cmdSync();
@@ -155,6 +220,12 @@ async function main() {
       break;
     case "prod":
       await cmdProd(args);
+      break;
+    case "completions-log":
+      await cmdCompletionsLog();
+      break;
+    case "completions-list":
+      await cmdCompletionsList();
       break;
     case "doc":
       await cmdDoc(args);

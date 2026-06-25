@@ -191,14 +191,27 @@ src/
 - **Workspace sync is the dev deploy mechanism**: `bun run sync` pushes the entire workspace
   to the dev device. Fleet devices receive configs via HTTP tarball.
 
-- **Convenience wrappers**: The `bin/prod` wrapper and `completions/prod.bash` completion
-  are synced with the workspace. On the dev device, add to `.bashrc` for TAB completion and
-  `prod` command at the terminal:
+- **Convenience wrappers**: The `bin/prod` wrapper, SQLite-backed frequency tracker
+  (`src/core/completions-db.ts`), and both fish/bash completions are synced with the
+  workspace.
 
+  **Devel host (fish shell)** — completions auto-loaded from `~/.config/fish/completions/bun.fish`;
+  Ctrl+F opens fzf directly via `conf.d/bun-run.fish`:
+
+  ```fish
+  # ~/.config/fish/config.fish
+  fisher install PatrickF1/fzf.fish   # enhanced fzf search
+  ```
+
+  **Dev device (bash)** — add to `.bashrc`:
   ```bash
   export PATH="$HOME/Localization_ws/bin:$PATH"
-  source "$HOME/Localization_ws/completions/prod.bash" 2>/dev/null
+  source "$HOME/Localization_ws/completions/bun-localization.bash" 2>/dev/null
   ```
+
+  The completion system uses `bun:sqlite` (bundled with Bun) to track frequency.
+  Frequently used commands and recipes automatically sort to the top of the completion list.
+  The history database lives at `~/.local/state/l10n/completions.db`.
 
 ---
 

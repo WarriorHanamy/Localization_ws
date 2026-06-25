@@ -66,9 +66,10 @@ bun run prod start  # no recipe → opens fzf menu
 | Action                     | Command                          | What it does                                              |
 | -------------------------- | -------------------------------- | --------------------------------------------------------- |
 | **Sync workspace**         | `bun run sync`                   | rsync local workspace to device                           |
-| **Build SLAM image**       | `bun run docker-dbuild`          | Build `lio-slam:cuda0.0.0-run-ubuntu20.04-arm64` on device via SSH |
+| **Build all images**       | `bun run docker-dbuild`          | Build all runtime images (base → slam → calib) via SSH    |
 | **Build base image**       | `bun run docker-dbuild base`     | Build `lio-base:cuda0.0.0-run-ubuntu20.04-arm64` only     |
-| **Build calib image**      | `bun run docker-dbuild calib`    | Build `lio-calib:cuda0.0.0-run-ubuntu20.04-arm64`         |
+| **Build SLAM image**       | `bun run docker-dbuild slam`     | Build `lio-slam:cuda0.0.0-run-ubuntu20.04-arm64` only     |
+| **Build calib image**      | `bun run docker-dbuild calib`    | Build `lio-calib:cuda0.0.0-run-ubuntu20.04-arm64` only    |
 | **Push to registry**       | `bun run docker-push`            | Tag & push fleet images to local registry from golden Jetson |
 | **Start container**        | `bun run docker-start <recipe>`  | Start a named container for a recipe                     |
 | **Shell into container**   | `bun run docker-shell <recipe>`  | Exec interactive bash into a running container           |
@@ -182,8 +183,8 @@ ssh nv@192.168.55.1 'docker exec fastlio-c5pro-mid360s grep ERROR /root/.ros/log
 
 # === BUILD & DEPLOY ===
 bun run sync                     # push code to device
-bun run docker-dbuild            # compile SLAM image
-bun run docker-dbuild calib      # compile calib image
+bun run docker-dbuild            # compile all images (base, slam, calib)
+bun run docker-dbuild calib      # compile calib image only
 bun run docker-push              # push to local registry
 bun run check                    # verify SSH + remote toolchain
 
