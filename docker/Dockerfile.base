@@ -9,18 +9,30 @@ RUN apt-key add /tmp/ros-archive-keyring.gpg \
     && echo "deb [arch=arm64] http://mirrors.tuna.tsinghua.edu.cn/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros.list \
     && rm -f /tmp/ros-archive-keyring.gpg
 
-# Build and ROS dependencies (ARM64)
+# Layer A — build toolchain (extremely stable, ~500MB)
 RUN apt-get update && apt-get install -y \
     libpcap-dev \
     libeigen3-dev \
     libopencv-dev \
     python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer B — ROS Noetic base (extremely stable, ~400MB)
+RUN apt-get update && apt-get install -y \
     ros-noetic-ros-base \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer C — perception + transforms (PCL, cv-bridge, TF stack)
+RUN apt-get update && apt-get install -y \
     ros-noetic-pcl-ros \
     ros-noetic-cv-bridge \
     ros-noetic-eigen-conversions \
     ros-noetic-tf \
     ros-noetic-tf2-geometry-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Layer D — MAVROS stack (drone-specific, ~200MB)
+RUN apt-get update && apt-get install -y \
     ros-noetic-mavros \
     ros-noetic-mavros-extras \
     geographiclib-tools \
