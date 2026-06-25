@@ -67,6 +67,23 @@ and `ssh` commands.
 RVIZ is an exception — it runs natively on the Jetson's display `:0` for GPU
 access, viewed remotely via VNC or RustDesk.
 
+### Docker image lifecycle
+
+`fastlio-jetson:latest` is built **locally** on the dev-device — it is never published
+to Docker Hub. A bare `docker pull fastlio-jetson` will fail (no registry prefix).
+
+| Stage      | Command                     | Where                       |
+| ---------- | --------------------------- | --------------------------- |
+| Build      | `bun run docker-dbuild`     | dev-device (via SSH)        |
+| Distribute | `bun run docker-push`       | dev-device → local registry |
+| Deploy     | `docker pull <ip>:5000/...` | fleet-device                |
+| Verify     | `docker run --rm ...`       | dev-device / fleet-device   |
+
+The image only exists on the dev-device's local Docker daemon after `docker-dbuild`.
+For fleet deployment, first start a local registry on the dev-host
+(`bun run registry start`), then push (`bun run docker-push`), then fleet devices
+pull via `docker pull <dev-host-ip>:5000/fastlio-jetson:latest`.
+
 ### CI certification (agent responsibility)
 
 After any code or config change that affects SLAM behavior, the agent MUST
