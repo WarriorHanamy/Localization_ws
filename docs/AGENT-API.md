@@ -83,7 +83,7 @@ bun run prod start  # no recipe → opens fzf menu
 | **Stop**            | `bun run registry stop`         | Stop registry + tracker                       |
 | **Status**          | `bun run registry status`       | Show registry container/tracker status        |
 
-Registry runs on the devel host. Direct push port: `5050`, public proxy port: `5000`.
+Registry runs on the devel host. Direct registry port: `5443`; fleet tracker/proxy port: `5000`.
 Fleet clients pull via `docker pull <lan-ip>:5000/fastlio-jetson:latest`.
 
 ---

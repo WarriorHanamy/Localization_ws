@@ -198,7 +198,8 @@ function doStatus() {
 
   const lanIP = getDevelHostLANIP();
   if (lanIP) {
-    console.log(`  Endpoint:  ${lanIP}:${REGISTRY_PORT}`);
+    console.log(`  Fleet:     http://${lanIP}:${REGISTRY_PORT}`);
+    console.log(`  Registry:  https://${lanIP}:${REGISTRY_DIRECT_PORT}`);
   }
 }
 

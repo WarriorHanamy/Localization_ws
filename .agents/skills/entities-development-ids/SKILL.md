@@ -29,7 +29,7 @@ description: Clarify the five runtime entities (dev-host, dev-device, fleet-devi
 ## 2. Connection Topology
 
 ```
-dev-host ───USB/RNDIS─── dev-device ──build→push── registry(:5050) ──pull── fleet-device (×N)
+dev-host ───USB/RNDIS─── dev-device ──build→push── registry(:5443) ──pull── fleet-device (×N)
 (x86_64)   192.168.55.x   (aarch64)         on dev-host              (aarch64, standalone)
                               │                                                  │
                         docker run                                        docker run
@@ -74,9 +74,9 @@ Image contents are frozen at build time. Runtime configs come from bind-mounted 
 ### Fleet Chain (production, N devices)
 
 ```
-dev-device ──docker push──>  registry on dev-host (:5050)
+dev-device ──docker push──>  registry on dev-host (:5443)
                                     │
-                       docker pull (:5000 proxy) ──────────────── fleet-device
+                       docker pull (:5000 tracker/proxy) ───────── fleet-device
                                     │                                    │
                        wget bringup tar (:8080) ────────────────── workspace configs
                                                                          │
