@@ -9,25 +9,6 @@ const TARGETS: Record<string, { dockerfile: string; tag: string; depends?: strin
   calib:   { dockerfile: "docker/Dockerfile.calib", tag: DOCKER_IMAGE_CALIB, depends: "base" },
 };
 
-function sdkStageCommands(): string {
-  const sdkRoot = "/usr/local";
-  const sdkStage = `${REC_DEVICE_LOC_WS}/.docker-sdk/livox_sdk2`;
-  return [
-    `set -euo pipefail`,
-    `stage=${$.escape(sdkStage)}`,
-    `install -d "$stage/lib" "$stage/include"`,
-    `test -f ${$.escape(sdkRoot)}/lib/liblivox_lidar_sdk_static.a`,
-    `test -f ${$.escape(sdkRoot)}/lib/liblivox_lidar_sdk_shared.so`,
-    `ar t ${$.escape(sdkRoot)}/lib/liblivox_lidar_sdk_static.a | grep -qx mid360s_command_handler.cpp.o`,
-    `install -m 0644 ${$.escape(sdkRoot)}/lib/liblivox_lidar_sdk_static.a "$stage/lib/"`,
-    `install -m 0644 ${$.escape(sdkRoot)}/lib/liblivox_lidar_sdk_shared.so "$stage/lib/"`,
-    `install -m 0644 ${$.escape(sdkRoot)}/include/livox_lidar_api.h "$stage/include/"`,
-    `install -m 0644 ${$.escape(sdkRoot)}/include/livox_lidar_cfg.h "$stage/include/"`,
-    `install -m 0644 ${$.escape(sdkRoot)}/include/livox_lidar_def.h "$stage/include/"`,
-    `cd ${$.escape(REC_DEVICE_LOC_WS)}`,
-  ].join("; ");
-}
-
 function buildCommand(dockerfile: string, tag: string): string {
   return [
     "set -euo pipefail",
@@ -72,12 +53,6 @@ export async function cmdDockerBuild(target?: string): Promise<void> {
     throw new Error("bringup/resource/ sync failed");
   }
   console.log(`[docker-build] bringup/resource/ synced.`);
-
-  console.log(`[docker-build] Staging verified dev-device Livox SDK2 (Mid360s enabled) ...`);
-  const sdkExitCode = await runSSHStreaming(sdkStageCommands());
-  if (sdkExitCode !== 0) {
-    throw new Error("SDK2 staging failed on dev device");
-  }
 
   // Build dependency chain
   if (cfg.depends) {

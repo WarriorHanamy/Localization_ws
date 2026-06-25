@@ -19,6 +19,8 @@
     "docker-push": "bun src/cli/index.ts docker-push",
     "docker-start": "bun src/cli/index.ts docker-start",
     "docker-shell": "bun src/cli/index.ts docker-shell",
+    "fleet-bundle": "bun src/cli/index.ts fleet-bundle",
+    "fleet-artifacts": "bun src/cli/index.ts fleet-artifacts",
     "registry": "bun src/cli/index.ts registry",
     "prod": "bun src/cli/index.ts prod",
     "help": "bun src/cli/index.ts --help"

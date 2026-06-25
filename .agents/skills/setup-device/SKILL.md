@@ -1,6 +1,6 @@
 ---
 name: setup-device
-description: Use when setting up core essential utilities on a {DEVICE} Jetson device: initial SSH via IP, mDNS/avahi-daemon, tmux, NTP time sync via wlan0, bash default shell, oh-my-bash, WiFi lock to Diff* SSID, SSH key deployment. Triggers when user mentions initializing a fresh Jetson, mDNS not resolving, installing tmux/NTP/oh-my-bash, locking WiFi, or configuring a new device.
+description: Use when setting up core essential utilities on a {DEVICE} Jetson device: initial SSH via IP, mDNS/avahi-daemon, tmux, NTP time sync via wlan0, bash default shell, oh-my-bash, docker group, WiFi lock to Diff* SSID, SSH key deployment. Triggers when user mentions initializing a fresh Jetson, mDNS not resolving, installing tmux/NTP/oh-my-bash, locking WiFi, or configuring a new device.
 ---
 
 # Setup Device
@@ -8,7 +8,7 @@ description: Use when setting up core essential utilities on a {DEVICE} Jetson d
 Configure a {DEVICE} Jetson device with core utilities: initial SSH access via IP (fallback when
 mDNS not available), mDNS/avahi-daemon so `nv-{DEVICE}.local` resolves, SSH key deployment for
 passwordless access, WiFi lock to Diff* SSID (all other WiFi disabled), NTP time sync via
-wlan0, tmux with mouse support, bash as default shell, oh-my-bash, default SSH working
+wlan0, tmux with mouse support, bash as default shell, oh-my-bash, docker group, default SSH working
 directory.
 
 ## Prerequisites
@@ -138,28 +138,107 @@ path. If so, update it for this device. See `resource/config-ssh-default-folder.
 
 After step 0.6 completes, all subsequent SSH commands use the same IP (`192.168.55.1`). The mDNS hostname is reserved exclusively for WiFi production operations and should never be used for development SSH connections.
 
+### 0.7. Reset APT sources to default
+
+The device may ship with non-standard APT mirrors (e.g. Tsinghua) that can cause GPG key errors
+or missing packages. Reset to the official Ubuntu ARM ports and ROS repositories before any
+package installation.
+
+**0.7.1 Write default Ubuntu sources.list:**
+
+```bash
+cat <<'EOF' | ssh nv@192.168.55.1 "sudo tee /etc/apt/sources.list > /dev/null"
+deb http://ports.ubuntu.com/ubuntu-ports/ focal main restricted universe multiverse
+deb http://ports.ubuntu.com/ubuntu-ports/ focal-updates main restricted universe multiverse
+deb http://ports.ubuntu.com/ubuntu-ports/ focal-backports main restricted universe multiverse
+deb http://ports.ubuntu.com/ubuntu-ports/ focal-security main restricted universe multiverse
+# deb-src http://ports.ubuntu.com/ubuntu-ports/ focal main restricted universe multiverse
+# deb-src http://ports.ubuntu.com/ubuntu-ports/ focal-updates main restricted universe multiverse
+# deb-src http://ports.ubuntu.com/ubuntu-ports/ focal-backports main restricted universe multiverse
+# deb-src http://ports.ubuntu.com/ubuntu-ports/ focal-security main restricted universe multiverse
+EOF
+```
+
+**0.7.2 Write default ROS sources (official ROS repos):**
+
+```bash
+cat <<'EOF' | ssh nv@192.168.55.1 "sudo tee /etc/apt/sources.list.d/ros-fish.list > /dev/null"
+deb [arch=arm64] http://packages.ros.org/ros/ubuntu focal main
+deb [arch=arm64] http://packages.ros.org/ros2/ubuntu focal main
+EOF
+```
+
+**0.7.3 Remove librealsense repo (missing GPG key, not used):**
+
+The `librealsense` repo often appears in JetPack images but its GPG key may be absent,
+causing `apt-get update` warnings. Remove it since this project does not use librealsense.
+
+```bash
+ssh nv@192.168.55.1 "sudo sed -i '/librealsense/s/^deb /# deb /' /etc/apt/sources.list"
+```
+
+**0.7.4 Update package index:**
+
+```bash
+ssh nv@192.168.55.1 "sudo apt-get update -qq"
+```
+
+The command must complete without GPG key errors.
+
+**Verify:**
+
+```bash
+ssh nv@192.168.55.1 "bash -lc '
+echo \"=== sources.list first line ===\"
+head -1 /etc/apt/sources.list
+echo \"=== ROS sources ===\"
+cat /etc/apt/sources.list.d/ros-fish.list
+echo \"=== librealsense commented out ===\"
+grep librealsense /etc/apt/sources.list
+echo \"=== apt update clean ===\"
+sudo apt-get update -qq 2>&1 | tail -3
+'"
+```
+
+### 0.8. Set system language to English
+
+The device may ship with a non-English locale (e.g. `zh_CN.UTF-8`). Switch to `en_US.UTF-8`
+for consistent tool output and logging.
+
+**0.8.1 Install English language pack (if missing):**
+
+```bash
+ssh nv@192.168.55.1 "sudo apt-get install -y language-pack-en-base 2>/dev/null || sudo apt-get install -y language-pack-en"
+```
+
+**0.8.2 Generate en_US.UTF-8 locale and set as default:**
+
+```bash
+ssh nv@192.168.55.1 "bash -lc '
+sudo locale-gen en_US.UTF-8
+sudo update-locale LANG=en_US.UTF-8 LANGUAGE=en_US:en
+sudo localectl set-locale LANG=en_US.UTF-8
+sudo localectl set-locale LANGUAGE=en_US:en
+'"
+```
+
+**0.8.3 Verify locale:**
+
+```bash
+ssh nv@192.168.55.1 "bash -lc 'cat /etc/default/locale; echo ---; locale | head -5'"
+```
+
+Expected output: `LANG=en_US.UTF-8`, `LANGUAGE=en_US:en`.
+
+The change takes effect on next login. New SSH sessions will use English.
+
 ### 1. Install essential packages
 
 ```bash
-ssh nv@192.168.55.1 "bash -lc 'sudo apt-get update -qq && sudo apt-get install -y tmux curl git'"
+ssh nv@192.168.55.1 "bash -lc 'sudo apt-get install -y tmux curl git'"
 ```
 
-### 1.1. Install `uv` (Python package manager)
-
-The orchestrator CLI uses `bun run` for all entry points. `uv` is still used on the Jetson for Python package management.
-
-```bash
-ssh nv@192.168.55.1 "bash -lc 'curl -fsSL https://astral.sh/uv/install.sh | bash'"
-```
-
-After installation, ensure `~/.local/bin` is in `PATH` (the install script adds it to
-`~/.profile`). Verify:
-
-```bash
-ssh nv@192.168.55.1 "bash -lc 'source ~/.profile && uv --version'"
-```
-
-### 1.2. Configure LiDAR wired interface (eth0)
+### 1.1. Configure LiDAR wired interface (eth0)
 
 The MID360 LiDAR connects via Ethernet and requires a static IP on the `192.168.2.0/24`
 subnet (as configured in `src/bringup/config/c5v1_livox_mid360_config.json`).
@@ -180,7 +259,7 @@ ssh nv@192.168.55.1 "ip addr show eth0 2>&1 | grep 'inet '"
 
 Expected output: `inet 192.168.2.50/24 brd 192.168.2.255 ...`
 
-### 1.3. Configure dual-path network routing
+### 1.2. Configure dual-path network routing
 
 The USB RNDIS link (`192.168.55.1` via `l4tbr0`) provides a low-latency wired
 connection for bulk data transfer. WiFi (`wlan0`) provides general SSH access
@@ -203,7 +282,7 @@ echo '192.168.55.1 nv-{DEVICE}' | sudo tee -a /etc/hosts
 
 **1.3.2 Restrict mDNS to wlan0 (Jetson):**
 
-After WiFi is connected and working (Step 1.5), limit `avahi-daemon` to only
+After WiFi is connected and working (Step 1.4), limit `avahi-daemon` to only
 publish on `wlan0`. This ensures `nv-{DEVICE}.local` always resolves to the WiFi IP,
 preventing ethernet interface IPs (eth0, l4tbr0) from leaking into mDNS:
 
@@ -227,7 +306,22 @@ ping -c1 -W1 192.168.55.1
 bun run check
 ```
 
-### 1.5. Lock WiFi to Diff* SSID
+### 1.3. Add nv user to docker group
+
+Docker is pre-installed on JetPack but `nv` must be in the `docker` group to build images
+without `sudo`.
+
+```bash
+ssh nv@192.168.55.1 "sudo usermod -aG docker nv && newgrp docker"
+```
+
+Verify:
+
+```bash
+ssh nv@192.168.55.1 "bash -lc 'groups nv | grep -q docker && echo OK || echo FAIL'"
+```
+
+### 1.4. Lock WiFi to Diff* SSID
 
 Lock wlan0 to only connect to a single SSID matching `Diff*` (e.g. `DiffRobot（5G）`) with
 password `888888888`. All other WiFi connection profiles are removed, and a NetworkManager
@@ -413,6 +507,7 @@ ssh nv@192.168.55.1 "bash -lc 'ls -la ~/Localization_ws/pyproject.toml'"
 | USB link | `ping -c1 -W1 192.168.55.1` | 0% packet loss, low latency |
 | integration routing | `bun run check` | `USB (192.168.55.1)` in output |
 | SSH key | `ssh nv@192.168.55.1 "echo OK"` | `OK` (no password prompt) |
+| Docker group | `ssh nv@192.168.55.1 "bash -lc 'groups nv | grep -q docker && echo OK'"` | `OK` |
 | tmux | `ssh nv@192.168.55.1 "bash -lc 'tmux -V'"` | `tmux 3.0a` |
 | NTP | `ssh nv@192.168.55.1 "bash -lc 'timedatectl show --property=NTPSynchronized --value'"` | `yes` |
 | NTP route | `ssh nv@192.168.55.1 "bash -lc 'ip route get 185.125.190.58'"` | `via 192.168.110.1 dev wlan0` |
@@ -423,6 +518,10 @@ ssh nv@192.168.55.1 "bash -lc 'ls -la ~/Localization_ws/pyproject.toml'"
 | WiFi lock dispatcher | `ssh nv@192.168.55.1 "bash -lc 'test -x /etc/NetworkManager/dispatcher.d/91-wifi-lock && echo YES'"` | `YES` |
 | LiDAR eth0 | `ssh nv@192.168.55.1 "bash -lc 'ip addr show eth0 | grep \\\"inet 192.168.2\\\"'"` | `192.168.2.50/24` |
 | SSH working dir | `ssh -t nv@192.168.55.1 'bash -l -c pwd'` | `/home/nv/Localization_ws` |
+| Language | `ssh nv@192.168.55.1 "bash -lc 'cat /etc/default/locale'"` | `LANG=en_US.UTF-8` |
+| APT sources | `ssh nv@192.168.55.1 "bash -lc 'head -1 /etc/apt/sources.list'"` | `deb http://ports.ubuntu.com/...` |
+| ROS sources | `ssh nv@192.168.55.1 "bash -lc 'cat /etc/apt/sources.list.d/ros-fish.list'"` | References `packages.ros.org` |
+| GPG key clean | `ssh nv@192.168.55.1 "sudo apt-get update -qq 2>&1 | grep -c 'NO_PUBKEY'"` | `0` |
 
 ## Troubleshooting
 
@@ -445,6 +544,10 @@ ssh nv@192.168.55.1 "bash -lc 'ls -la ~/Localization_ws/pyproject.toml'"
 | integration goes via WiFi instead of USB | USB cable disconnected or `192.168.55.1` unreachable | Connect USB-C cable; run `bun run check` to verify routing via USB |
 | `nv-{DEVICE}.local` resolves to wrong IP (e.g. `192.168.2.50` or `172.17.0.1`) instead of WiFi IP | Process contention on port 5353 (mDNS) -- typically `nxserver.bin` (NoMachine) advertising on all interfaces | See `resource/mDNS-debug.md` |
 | wlan0 cannot associate with Diff* SSID (`ASSOC-REJECT status_code=1`, `nl80211: kernel reports: Authentication algorithm number required`) | NVIDIA BSP `rtl8822ce` driver has incomplete nl80211 auth support | Run `resource/fix-rtw88-wifi.sh` to replace with lwfinger/rtw88 driver |
+| `apt-get update` shows `NO_PUBKEY` for librealsense | librealsense repo still active in sources.list | Comment out or remove the librealsense line (Step 0.7.3); `sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys <KEY>` alternative |
+| `apt-get update` fails after reset | Network or DNS issue preventing access to `ports.ubuntu.com` | Verify wlan0 has internet access; check `ping ports.ubuntu.com`; fallback to Tsinghua mirror temporarily |
+| Locale not switching to English | `en_US.UTF-8` not generated or `update-locale` not idempotent | Re-run Step 0.8.2; verify `locale -a | grep en_US` |
+| ROS sources point to Tsinghua mirror | `ros-fish.list` was not overwritten by Step 0.7.2 | Check content of `/etc/apt/sources.list.d/ros-fish.list`; re-run Step 0.7.2 |
 
 ---
 

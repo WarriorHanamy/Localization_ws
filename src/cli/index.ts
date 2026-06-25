@@ -8,6 +8,8 @@ import { cmdDockerBuild } from "./docker-build";
 import { cmdDockerStart } from "./docker-start";
 import { cmdDockerShell } from "./docker-shell";
 import { cmdDockerPush } from "./docker-push";
+import { cmdFleetBundle } from "./fleet-bundle";
+import { cmdFleetArtifacts } from "./fleet-artifacts";
 import { cmdRegistry } from "./registry";
 import { cmdProd } from "./prod";
 import { cmdDoc } from "./doc";
@@ -43,6 +45,12 @@ Docker commands:
   docker-push        push image to local registry (from golden Jetson)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
+
+Fleet bootstrap:
+  fleet-bundle [version]     pack bringup/ → tarball + sha256 + latest.txt
+  fleet-artifacts start      start artifact HTTP server on :8080
+  fleet-artifacts stop       stop artifact server
+  fleet-artifacts status     show artifact server status
 
 Registry:
   registry start     start registry:2 + pull tracker proxy
@@ -132,6 +140,12 @@ async function main() {
       break;
     case "docker-push":
       await cmdDockerPush();
+      break;
+    case "fleet-bundle":
+      await cmdFleetBundle(args[0]);
+      break;
+    case "fleet-artifacts":
+      await cmdFleetArtifacts(args);
       break;
     case "registry":
       await cmdRegistry(args);

@@ -121,6 +121,53 @@ bun run sync && bun run docker-dbuild
 
 The agent MUST NOT ask the user to run sync, build, or docker-dbuild manually.
 
+### Fleet Bootstrap Preflight
+
+Before executing a fleet device bootstrap test (`curl ... | bash` on Jetson),
+the agent MUST verify all 4 live checks **in parallel**:
+
+**1. Registry live**
+
+```bash
+curl -fs http://192.168.108.83:5000/v2/_catalog
+```
+
+Expected: HTTP 200 + JSON body (`{"repositories":[...]}`).
+Failure: run `bun run registry start` then re-check.
+
+**2. Artifact server live**
+
+```bash
+curl -fs http://192.168.108.83:8080/artifacts/fastlio/latest.txt
+```
+
+Expected: HTTP 200 + non-empty version string.
+Failure: run `bun run fleet-artifacts start` then re-check.
+
+**3. Runtime bundle exists**
+
+```bash
+stat /home/rec/opt/loc-artifacts/artifacts/fastlio/fastlio-runtime-*.tar.gz
+```
+
+Expected: file exists.
+Failure: run `bun run fleet-bundle` then re-check.
+
+**4. Jetson reachable**
+
+```bash
+ssh nv@192.168.55.1 'echo OK'
+```
+
+Expected: stdout contains "OK".
+Failure: abort, report unreachable Jetson to user.
+
+**Failure handling:**
+
+- If **any** check fails → print `[X] <check name>: <reason>`, abort bootstrap
+- If **all** 4 pass → proceed to fleet device bootstrap test
+- After fixing a failed check, re-run all 4 checks (don't skip)
+
 ### Smoke tests (human visual inspection)
 
 Tests that require human visual verification MUST provide a single command:

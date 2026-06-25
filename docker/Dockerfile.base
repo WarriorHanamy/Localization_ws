@@ -30,10 +30,12 @@ RUN apt-get update && apt-get install -y \
 # MAVROS requires EGM96 geoid model for UAS transformations.
 RUN /opt/ros/noetic/lib/mavros/install_geographiclib_datasets.sh
 
-# Livox SDK2 staged from the device host by `bun run docker-dbuild`.
-# The build command rejects SDK archives without Mid360s support.
-COPY .docker-sdk/livox_sdk2/lib/     /usr/local/lib/
-COPY .docker-sdk/livox_sdk2/include/ /usr/local/include/
+# Livox SDK2 — pre-built, staged in bringup/resource/ (same pattern as livox_ros_driver2)
+COPY bringup/resource/livox_sdk2/liblivox_lidar_sdk_static.a  /usr/local/lib/
+COPY bringup/resource/livox_sdk2/liblivox_lidar_sdk_shared.so /usr/local/lib/
+COPY bringup/resource/livox_sdk2/livox_lidar_api.h           /usr/local/include/
+COPY bringup/resource/livox_sdk2/livox_lidar_cfg.h           /usr/local/include/
+COPY bringup/resource/livox_sdk2/livox_lidar_def.h           /usr/local/include/
 RUN ldconfig
 
 # Livox driver — pre-built, staged in bringup/resource/ (same pattern as SDK2)

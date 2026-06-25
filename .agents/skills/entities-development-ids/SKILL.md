@@ -11,7 +11,7 @@ description: Clarify the five runtime entities (dev-host, dev-device, fleet-devi
 | ------------------ | ------------------------------------ | ---------------------------------------------- |
 | `dev-host`         | Local development workstation (x86)  | `bun run <cmd>`, direct filesystem             |
 | `dev-device`       | Development Jetson (USB-connected)   | `ssh nv@192.168.55.1`, `runSSH(cmd)`           |
-| `fleet-device`     | Production Jetson on aircraft (WiFi) | Self-contained, no external SSH control        |
+| `fleet-device`     | Production Jetson on aircraft (WiFi) | Self-contained, no external SSH control; bootstrap via `curl ... | bash` |
 | `device-container` | Docker container on any Jetson       | `docker exec <name> bash -c '...'`             |
 | `device-image`     | Docker image (build snapshot)        | `docker run -d --name ... lio-slam:cuda0.0.0-run-ubuntu20.04-arm64` |
 
@@ -19,22 +19,25 @@ description: Clarify the five runtime entities (dev-host, dev-device, fleet-devi
 
 | Dimension           | `dev-device`                              | `fleet-device`                            |
 | ------------------- | ----------------------------------------- | ----------------------------------------- |
-| Network             | USB RNDIS (`192.168.55.1`)                | WiFi LAN (Diff* SSID)                     |
-| Code path           | `bun run sync` (rsync over USB)           | `wget` bringup tarball from HTTP `:8080`    |
-| Image path          | `docker build` locally, then push         | `docker pull` from dev-host registry        |
-| Runtime control     | dev-host SSH starts/stops/monitors        | Autonomous, no external orchestration     |
-| Builds images       | Yes (sole build node)                     | No                                        |
-| RViz visualization  | Yes (via NoMachine to `:0`)               | No                                        |
+| Network             | USB RNDIS (`192.168.55.1`)                | WiFi LAN (Diff* SSID)                          |
+| Code path           | `bun run sync` (rsync over USB)           | `curl ... | bash` bootstrap script            |
+| Runtime config      | `bun run sync` bringup/ (bind-mount)      | `wget` runtime bundle from HTTP `:8080`       |
+| Image path          | `docker build` locally, then push         | `docker pull` from dev-host registry `:5000`  |
+| Runtime control     | dev-host SSH starts/stops/monitors        | Autonomous via `/opt/fastlio/bin/fastlio-ctl`  |
+| Builds images       | Yes (sole build node)                     | No                                             |
+| RViz visualization  | Yes (via NoMachine to `:0`)               | No                                             |
+| Bootstrap           | `bun run sync && bun run prod`            | `curl -fsSL http://<ip>:8080/install/fastlio \| bash` |
 
 ## 2. Connection Topology
 
 ```
 dev-host ───USB/RNDIS─── dev-device ──build→push── registry(:5443) ──pull── fleet-device (×N)
-(x86_64)   192.168.55.x   (aarch64)         on dev-host              (aarch64, standalone)
-                              │                                                  │
-                        docker run                                        docker run
-                              ▼                                                  ▼
-                      device-container                                  device-container
+(x86_64)   192.168.55.x   (aarch64)         on dev-host  :5000       (aarch64, standalone)
+                              │                    │                          │
+                        docker run          artifact server              curl | bash
+                              │               :8080, :8080/install/          │
+                              ▼                    ▼                         ▼
+                      device-container       fastlio.template.sh     device-container
 ```
 
 Both device types share the same `device-container` and `device-image` artifacts.
@@ -74,20 +77,37 @@ Image contents are frozen at build time. Runtime configs come from bind-mounted 
 ### Fleet Chain (production, N devices)
 
 ```
-dev-device ──docker push──>  registry on dev-host (:5443)
-                                    │
-                       docker pull (:5000 tracker/proxy) ───────── fleet-device
-                                    │                                    │
-                       wget bringup tar (:8080) ────────────────── workspace configs
-                                                                         │
-                                                                   docker run -d ...
-                                                                         │
-                                                                         ▼
-                                                                  device-container
+dev-device ──docker push──>  registry on dev-host (:5443)  ──docker pull──  fleet-device
+                                    │                                             │
+                        fleet-bundle (bun CLI)                                    │
+                              │                                                   │
+                              ▼                                                   │
+                    artifact-server (:8080) ──curl | bash──  bootstrap script     │
+                    $HOME/opt/loc-artifacts/                   │                 │
+                      └── artifacts/fastlio/                    │                 │
+                      │   └── fastlio-runtime-*.tar.gz          │                 │
+                      └── install/fastlio                       │                 │
+                                   │                            ▼                 │
+                                   └───────── wget runtime ──► extract            │
+                                                                │                │
+                                                          docker run -d ──────────┘
+                                                                │
+                                                                ▼
+                                                         device-container
 ```
 
-Fleet-devices pull the pre-built image and fetch config updates via HTTP tarball.
-No SSH, no rsync, no local docker build.
+Fleet-devices use a one-line bootstrap script (`curl ... | bash`) that:
+1. Reads local hardware config (`/opt/fastlio/etc/device.yaml`)
+2. Downloads + verifies runtime bundle from artifact server `:8080`
+3. Extracts to `/opt/fastlio/runtime/releases/<version>/`
+4. Switches `current` symlink
+5. Reads `manifest.yaml` → determines image tag + docker run args
+6. `docker pull` from dev-host registry `:5000`
+7. Stops old container, starts new one
+8. Polls for `/tmp/slam_ready` health signal
+9. Prints deployment summary
+
+No SSH, no rsync, no Bun, no local docker build on fleet devices.
 
 Docker image references follow `.agents/skills/docker-image-naming/SKILL.md`.
 
@@ -170,6 +190,10 @@ fleet-devices operate autonomously. Log inspection requires physical access or
 on-board telemetry (MQTT bridge → dashboard). The same Docker stdout and ROS
 log paths exist inside the container, but there is no dev-host SSH bridge.
 
+Container readiness is signaled inside the container at `/tmp/slam_ready`
+(created by `docker/entrypoint.sh` when `/Odometry` topic appears).
+The bootstrap script checks this file via `docker exec` after container start.
+
 ## 7. Quick Reference
 
 | Operation                     | Command                                                 |
@@ -179,7 +203,7 @@ log paths exist inside the container, but there is no dev-host SSH bridge.
 | Build Docker image            | `bun run docker-dbuild` (runs on dev-device over SSH)   |
 | Push image to registry        | `bun run docker-push` (from dev-device)                 |
 | Start container (dev)         | `bun run prod <recipe>` (auto-bridges to dev-device)    |
-| Start container (fleet)       | `docker pull <registry>/lio-slam:cuda0.0.0-run-ubuntu20.04-arm64 && docker run ...` |
+| Start container (fleet)       | `curl -fsSL http://<lan-host>:8080/install/fastlio \| bash` |
 | Stop container (dev)          | `bun run prod stop` / `bun run prod reset`              |
 | Shell into container          | `bun run docker-shell <recipe>`                         |
 | List dev-device processes     | `ssh nv@192.168.55.1 'pgrep -af <pattern>'`             |
@@ -189,15 +213,19 @@ log paths exist inside the container, but there is no dev-host SSH bridge.
 | Smoke test                    | `bun run smoke`                                         |
 | Launch dashboard              | `bun run dashboard`                                     |
 | Start registry + tracker      | `bun run registry start`                                |
-| Fleet deploy (future)         | `bun run fleet-deploy`                                  |
+| Fleet bundle                  | `bun run fleet-bundle [version]`                        |
+| Fleet artifacts server        | `bun run fleet-artifacts start`                         |
+| Fleet bootstrap (on device)   | `curl -fsSL http://<lan-ip>:8080/install/fastlio \| bash` |
 
 ## 8. Development vs Deployment
 
-| Aspect          | dev-device                                          | fleet-device                               |
-| --------------- | --------------------------------------------------- | ------------------------------------------ |
-| Bun CLI         | Runs on dev-host, bridges via SSH                   | Not available (no Bun on fleet devices)    |
-| Image source    | Built locally via `docker build`                    | Pulled from dev-host registry              |
-| Config source   | `bun run sync` (rsync)                              | HTTP tarball (`wget + tar xz`)             |
-| Runtime control | `bun run prod` via SSH tunneling                     | Self-bootstrapping script on device        |
-| Logging         | `tee -a` to `logs/`, readable over SSH               | Local Docker logs + MQTT telemetry         |
-| RViz            | Renders on Jetson `:0`, viewed via NoMachine         | Not used                                   |
+| Aspect          | dev-device                                          | fleet-device                                       |
+| --------------- | --------------------------------------------------- | -------------------------------------------------- |
+| Bun CLI         | Runs on dev-host, bridges via SSH                   | Not available (no Bun on fleet devices)            |
+| Image source    | Built locally via `docker build`                    | Pulled from dev-host registry `:5000`              |
+| Config source   | `bun run sync` (rsync)                              | Runtime bundle via HTTP `:8080` (`curl | bash`)    |
+| Bootstrap       | `bun run sync && bun run docker-dbuild && bun run prod` | `curl -fsSL http://<lan-ip>:8080/install/fastlio \| bash` |
+| Runtime control | `bun run prod` via SSH tunneling                     | `docker stop/start fastlio-runtime` 或 `fastlio-ctl` |
+| Device config   | N/A (args passed via SSH CLI)                       | `/opt/fastlio/etc/device.yaml` (hardware, imu_src) |
+| Logging         | `tee -a` to `logs/`, readable over SSH               | Local Docker logs + MQTT telemetry                 |
+| RViz            | Renders on Jetson `:0`, viewed via NoMachine         | Not used                                           |

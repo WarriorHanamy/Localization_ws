@@ -28,6 +28,14 @@ export const DOCKER_REGISTRY_IMAGE = "registry:2";
 export const TRACKER_LOG = "logs/registry-pulls.json";
 export const MAX_TRACKER_ENTRIES = 1000;
 
+// Artifact server
+export const ARTIFACT_PORT = 8080;
+const configuredArtifactDir = Bun.env.LOCALIZATION_ARTIFACT_DIR?.trim();
+export const ARTIFACT_SRV_DIR = configuredArtifactDir || `${process.env.HOME}/opt/loc-artifacts`;
+if (!ARTIFACT_SRV_DIR.startsWith("/")) {
+  throw new Error(`ARTIFACT_SRV_DIR must be an absolute path: ${ARTIFACT_SRV_DIR}`);
+}
+
 const configuredLANHost = Bun.env.LOCALIZATION_LAN_HOST?.trim();
 export const LAN_HOST = configuredLANHost || "";
 
