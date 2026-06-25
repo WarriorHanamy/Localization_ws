@@ -1,0 +1,9 @@
+<launch>
+  <arg name="fcu_url" default="/dev/ttyTHS0:921600"/>
+
+  <include file="$(find bringup)/launch/smoke-l1.launch">
+    <arg name="fcu_url" value="$(arg fcu_url)"/>
+  </include>
+
+  <include file="$(find bringup)/launch/mapping.launch"/>
+</launch>

@@ -79,30 +79,38 @@ export const DOCKER_IMAGES = [
   { key: "calib", label: "Calib", image: DOCKER_IMAGE_CALIB },
 ] as const;
 
+export const RELEASE_CONFIGS = [
+  "c5v1-mid360-mavros",
+  "c5v1-mid360-livox",
+  "c5pro-mid360s-mavros",
+  "c5pro-mid360s-livox",
+] as const;
+export const DEFAULT_CONFIG = "c5v1-mid360-mavros";
+export type ReleaseConfig = (typeof RELEASE_CONFIGS)[number];
+
 export const RECIPES = {
-  // c5v1
-  "c5v1-livox":         { launch: "c5v1_slam.launch",       imu_src: "livox",  desc: "c5v1 + Livox IMU slam" },
-  "c5v1-mavros":        { launch: "c5v1_slam.launch",       imu_src: "mavros", desc: "c5v1 + MAVROS IMU slam" },
-  "c5v1-livox-map":     { launch: "c5v1_slam_map.launch",   imu_src: "livox",  desc: "c5v1 + Livox slam + map" },
-  "c5v1-mavros-map":    { launch: "c5v1_slam_map.launch",   imu_src: "mavros", desc: "c5v1 + MAVROS slam + map" },
-  "c5v1-livox-reloc":   { launch: "c5v1_slam_reloc.launch", imu_src: "livox",  desc: "c5v1 + Livox reloc" },
-  "c5v1-mavros-reloc":  { launch: "c5v1_slam_reloc.launch", imu_src: "mavros", desc: "c5v1 + MAVROS reloc" },
-  // c5pro
-  "c5pro-livox":        { launch: "c5pro_slam.launch",      imu_src: "livox",  desc: "c5pro + Livox IMU slam" },
-  "c5pro-mavros":       { launch: "c5pro_slam.launch",      imu_src: "mavros", desc: "c5pro + MAVROS IMU slam" },
-  "c5pro-livox-map":    { launch: "c5pro_slam_map.launch",  imu_src: "livox",  desc: "c5pro + Livox slam + map" },
-  "c5pro-mavros-map":   { launch: "c5pro_slam_map.launch",  imu_src: "mavros", desc: "c5pro + MAVROS slam + map" },
-  "c5pro-livox-reloc":  { launch: "c5pro_slam_reloc.launch", imu_src: "livox",  desc: "c5pro + Livox reloc" },
-  "c5pro-mavros-reloc": { launch: "c5pro_slam_reloc.launch", imu_src: "mavros", desc: "c5pro + MAVROS reloc" },
+  // c5v1-mid360-mavros
+  "c5v1-mid360-mavros":         { launch: "slam.launch",        desc: "c5v1 + Mid360 + MAVROS IMU slam" },
+  "c5v1-mid360-mavros-map":     { launch: "slam-map.launch",    desc: "c5v1 + Mid360 + MAVROS slam + map" },
+  "c5v1-mid360-mavros-reloc":   { launch: "slam-reloc.launch",  desc: "c5v1 + Mid360 + MAVROS reloc" },
+  // c5v1-mid360-livox
+  "c5v1-mid360-livox":          { launch: "slam.launch",        desc: "c5v1 + Mid360 + Livox IMU slam" },
+  "c5v1-mid360-livox-map":      { launch: "slam-map.launch",    desc: "c5v1 + Mid360 + Livox slam + map" },
+  "c5v1-mid360-livox-reloc":    { launch: "slam-reloc.launch",  desc: "c5v1 + Mid360 + Livox reloc" },
+  // c5pro-mid360s-mavros
+  "c5pro-mid360s-mavros":       { launch: "slam.launch",        desc: "c5pro + Mid360s + MAVROS IMU slam" },
+  "c5pro-mid360s-mavros-map":   { launch: "slam-map.launch",    desc: "c5pro + Mid360s + MAVROS slam + map" },
+  "c5pro-mid360s-mavros-reloc": { launch: "slam-reloc.launch",  desc: "c5pro + Mid360s + MAVROS reloc" },
+  // c5pro-mid360s-livox
+  "c5pro-mid360s-livox":        { launch: "slam.launch",        desc: "c5pro + Mid360s + Livox IMU slam" },
+  "c5pro-mid360s-livox-map":    { launch: "slam-map.launch",    desc: "c5pro + Mid360s + Livox slam + map" },
+  "c5pro-mid360s-livox-reloc":  { launch: "slam-reloc.launch",  desc: "c5pro + Mid360s + Livox reloc" },
   // smoke
-  "l1-livox":           { launch: "smoke_l1.launch",        imu_src: "livox",  desc: "L1 驱动频率 / Livox" },
-  "l1-mavros":          { launch: "smoke_l1.launch",        imu_src: "mavros", desc: "L1 驱动频率 / MAVROS" },
-  "l2-slam-livox":      { launch: "smoke_l2_slam.launch",   imu_src: "livox",  desc: "L2 SLAM / Livox" },
-  "l2-slam-mavros":     { launch: "smoke_l2_slam.launch",   imu_src: "mavros", desc: "L2 SLAM / MAVROS" },
-  "l2-fov-livox":       { launch: "smoke_l2_fov.launch",    imu_src: "livox",  desc: "L2 FOV 裁剪 / Livox" },
-  "l2-fov-mavros":      { launch: "smoke_l2_fov.launch",    imu_src: "mavros", desc: "L2 FOV 裁剪 / MAVROS" },
-  "l2-calib":           { launch: "smoke_l2_calib_bag.launch",  imu_src: "mavros", desc: "L2 标定 (bag + LI-Init)" },
-  "l2-eval":            { launch: "smoke_l2_eval.launch",   imu_src: "mavros", desc: "L2 评估 (ground plane)" },
+  "l1":           { launch: "smoke-l1.launch",        desc: "L1 driver frequency check" },
+  "l2-slam":      { launch: "smoke-l2-slam.launch",   desc: "L2 SLAM + RVIZ" },
+  "l2-fov":       { launch: "smoke-l2-fov.launch",    desc: "L2 SLAM + FOV crop + RVIZ" },
+  "l2-calib":     { launch: "smoke-l2-calib.launch",  desc: "L2 calibration (bag + LI-Init)" },
+  "l2-eval":      { launch: "smoke-l2-eval.launch",   desc: "L2 evaluation (ground plane)" },
 } as const;
 
 export type RecipeName = keyof typeof RECIPES;

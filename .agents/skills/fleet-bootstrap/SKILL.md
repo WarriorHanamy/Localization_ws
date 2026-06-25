@@ -40,7 +40,7 @@ Dev-Host (x86_64, 192.168.108.83)
 └── bun run fleet-bundle             generate + upload
 
 Fleet Device (aarch64, LAN)
-├── /opt/fastlio/
+├── $HOME/opt/fastlio/
 │   ├── etc/device.yaml              hardware config (one-time)
 │   ├── runtime/releases/<tag>/      bundle contents
 │   ├── runtime/current → releases/<tag>
@@ -57,13 +57,13 @@ Any failure before container start reverts the installation.
 
 | Step | Action | Error handling |
 | ---- | ------ | -------------- |
-| 1 | Read `/opt/fastlio/etc/device.yaml` → `hardware`, `imu_src` | If missing, print setup instructions, exit 1 |
+| 1 | Read `$HOME/opt/fastlio/etc/device.yaml` → `hardware`, `imu_src` | If missing, print setup instructions, exit 1 |
 | 2 | Resolve VERSION (CLI arg or `latest.txt`) | |
 | 3 | `wget` runtime bundle `.tar.gz` | Exit 1 |
 | 4 | `wget` `.tar.gz.sha256` | Exit 1 |
 | 5 | `sha256sum -c` | Delete partial download, exit 1 |
-| 6 | `tar xzf` → `/opt/fastlio/runtime/releases/<version>/` | |
-| 7 | `ln -sfn` → `/opt/fastlio/runtime/current` | |
+| 6 | `tar xzf` → `$HOME/opt/fastlio/runtime/releases/<version>/` | |
+| 7 | `ln -sfn` → `$HOME/opt/fastlio/runtime/current` | |
 | 8 | Read `current/manifest.yaml` | Exit 1 |
 | 9 | `docker pull <image>` | Exit 1 |
 | 10 | `docker stop/rm fastlio-runtime` (if exists) | Ignore errors |
@@ -86,11 +86,11 @@ container:
     - --ipc host
     - --privileged
   volumes:
-    - /opt/fastlio/runtime/current/config:/catkin_ws/src/bringup/config:ro
-    - /opt/fastlio/runtime/current/launch:/catkin_ws/src/bringup/launch:ro
-    - /opt/fastlio/runtime/current/scripts:/catkin_ws/src/bringup/scripts:ro
-    - /opt/fastlio/data/PCD:/catkin_ws/src/fast_lio/PCD
-    - /opt/fastlio/data/logs:/root/.ros/log
+    - $HOME/opt/fastlio/runtime/current/config:/catkin_ws/src/bringup/config:ro
+    - $HOME/opt/fastlio/runtime/current/launch:/catkin_ws/src/bringup/launch:ro
+    - $HOME/opt/fastlio/runtime/current/scripts:/catkin_ws/src/bringup/scripts:ro
+    - $HOME/opt/fastlio/data/PCD:/catkin_ws/src/fast_lio/PCD
+    - $HOME/opt/fastlio/data/logs:/root/.ros/log
   entrypoint: roslaunch bringup {hardware}_slam.launch imu_src:={imu_src}
 entrypoint:
   startup_timeout_sec: 30
@@ -98,11 +98,11 @@ entrypoint:
 ```
 
 The bootstrap script substitutes `{hardware}` and `{imu_src}` at runtime from
-`/opt/fastlio/etc/device.yaml`.
+`$HOME/opt/fastlio/etc/device.yaml`.
 
 ## 5. device.yaml Schema
 
-Written once per fleet device by the integrator. Located at `/opt/fastlio/etc/device.yaml`.
+Written once per fleet device by the integrator. Located at `$HOME/opt/fastlio/etc/device.yaml`.
 
 ```yaml
 hardware: c5v1        # c5v1 | c5pro
@@ -113,8 +113,8 @@ If absent, the bootstrap script prints:
 
 ```
 [fastlio] First-time setup required:
-  mkdir -p /opt/fastlio/etc
-  cat > /opt/fastlio/etc/device.yaml << 'EOF'
+  mkdir -p $HOME/opt/fastlio/etc
+  cat > $HOME/opt/fastlio/etc/device.yaml << 'EOF'
   hardware: c5v1
   imu_src: livox
   EOF
@@ -147,7 +147,7 @@ fastlio-runtime-<version>/
 ## 7. Fleet Device Layout
 
 ```
-/opt/fastlio/
+$HOME/opt/fastlio/
 ├── etc/
 │   └── device.yaml               # 硬件配置（人工写入，仅一次）
 ├── runtime/
@@ -174,10 +174,10 @@ Keep the last 3 releases. Rollback is a manual operation on the fleet device:
 
 ```bash
 # Roll back to previous release
-/opt/fastlio/bin/fastlio-ctl rollback
+$HOME/opt/fastlio/bin/fastlio-ctl rollback
 
 # Roll back to specific version
-/opt/fastlio/bin/fastlio-ctl rollback cuda0.0.0-run-ubuntu20.04-arm64
+$HOME/opt/fastlio/bin/fastlio-ctl rollback cuda0.0.0-run-ubuntu20.04-arm64
 ```
 
 Implementation: switch `current` symlink, re-read manifest.yaml, stop/restart container.

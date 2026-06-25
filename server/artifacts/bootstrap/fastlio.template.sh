@@ -1,57 +1,94 @@
 #!/bin/bash
 # fastlio bootstrap installer
-# Usage: curl -fsSL http://<ARTIFACT_SERVER>/install/fastlio | bash -s -- [VERSION]
+# Usage: curl -fsSL <SERVER>/install/fastlio | bash -s -- [CONFIG] [VERSION]
+#   CONFIG:  c5v1-mid360-mavros (default), c5v1-mid360-livox, c5pro-mid360s-mavros, c5pro-mid360s-livox
+#   VERSION: image tag or "latest" (default)
 set -euo pipefail
 
 readonly ARTIFACT_BASE="__ARTIFACT_BASE__"
-readonly RUNTIME_ROOT="/opt/fastlio/runtime"
-readonly DEVICE_CONFIG="/opt/fastlio/etc/device.yaml"
+readonly RUNTIME_ROOT="${HOME}/opt/fastlio"
 readonly CONTAINER_NAME="fastlio-runtime"
 
-# ── 1. Check dependencies ────────────────────────────────────────────────
-if ! command -v docker &>/dev/null; then
-  echo "[fastlio] ERROR: docker not found (pre-installed requirement)"
-  exit 1
-fi
+GREEN="\\033[32m"
+RED="\\033[31m"
+BOLD="\\033[1m"
+RESET="\\033[0m"
 
-# ── 2. Read device config ────────────────────────────────────────────────
-if [[ ! -f "$DEVICE_CONFIG" ]]; then
-  echo "[fastlio] First-time setup required:"
-  echo "  mkdir -p /opt/fastlio/etc"
-  echo "  cat > $DEVICE_CONFIG << 'EOF'"
-  echo "  hardware: c5v1"
-  echo "  imu_src: livox"
-  echo "  EOF"
-  exit 1
-fi
+# ── 1. Resolve config & version ───────────────────────────────────────
+CONFIG="${1:-c5v1-mid360-mavros}"
+case "$CONFIG" in
+  c5v1-mid360-mavros|c5v1-mid360-livox|c5pro-mid360s-mavros|c5pro-mid360s-livox) ;;
+  *) echo "[fastlio] Unknown config: $CONFIG"; exit 1 ;;
+esac
 
-HARDWARE=$(grep -E '^hardware:' "$DEVICE_CONFIG" | awk '{print $2}')
-IMU_SRC=$(grep -E '^imu_src:' "$DEVICE_CONFIG" | awk '{print $2}')
-if [[ -z "$HARDWARE" || -z "$IMU_SRC" ]]; then
-  echo "[fastlio] ERROR: $DEVICE_CONFIG missing hardware or imu_src"
-  exit 1
-fi
-echo "[fastlio] device config: hardware=$HARDWARE imu_src=$IMU_SRC"
-
-# ── 3. Resolve version ───────────────────────────────────────────────────
-VERSION="${1:-latest}"
+VERSION="${2:-latest}"
 if [[ "$VERSION" == "latest" ]]; then
-  echo "[fastlio] resolving latest version..."
-  VERSION=$(curl -fsSL "${ARTIFACT_BASE}/artifacts/fastlio/latest.txt" 2>/dev/null || \
-            wget -qO- "${ARTIFACT_BASE}/artifacts/fastlio/latest.txt" 2>/dev/null)
+  echo "[fastlio] resolving latest version for $CONFIG..."
+  VERSION=$(curl -fsSL "${ARTIFACT_BASE}/artifacts/fastlio/${CONFIG}/latest.txt" 2>/dev/null || \
+            wget -qO- "${ARTIFACT_BASE}/artifacts/fastlio/${CONFIG}/latest.txt" 2>/dev/null)
   if [[ -z "$VERSION" ]]; then
     echo "[fastlio] ERROR: cannot resolve latest version"
     exit 1
   fi
 fi
-echo "[fastlio] installing version: $VERSION"
+echo "[fastlio] config=$CONFIG version=$VERSION"
 
-# ── 4. Download + verify ─────────────────────────────────────────────────
+# ── 2. Check dependencies ──────────────────────────────────────────────
+if ! command -v docker &>/dev/null; then
+  echo "[fastlio] ERROR: docker not found"
+  exit 1
+fi
+
+if ! id -nG | grep -qw docker; then
+  if grep -q "^docker:.*:${USER}\b" /etc/group 2>/dev/null; then
+    echo "[fastlio] docker group needs this login session"
+    echo "  Run: newgrp docker && curl -fsSL ... | bash"
+    exit 1
+  else
+    echo "[fastlio] ERROR: user not in docker group"
+    echo "  Run once: sudo usermod -aG docker \$USER"
+    echo "  Then: newgrp docker && curl -fsSL ... | bash"
+    exit 1
+  fi
+fi
+
+# ── 3. Docker daemon setup ─────────────────────────────────────────────
+NEW_REG="192.168.108.83:5000"
+if systemctl show docker.service 2>/dev/null | grep -q 'Environment=.*HTTP_PROXY'; then
+  echo "[fastlio] WARNING: Docker daemon has HTTP_PROXY set"
+  echo "[fastlio]   Ensure no_proxy includes 192.168.108.0/22"
+fi
+CFG=/etc/docker/daemon.json
+CHANGED=0
+if [ ! -f "$CFG" ]; then
+  echo "{}" | sudo tee "$CFG" > /dev/null
+fi
+if ! grep -q "$NEW_REG" "$CFG"; then
+  echo "[fastlio] configuring Docker insecure-registry: $NEW_REG"
+  python3 -c "
+import json
+with open('$CFG') as f:
+    d = json.load(f)
+d.setdefault('insecure-registries', [])
+if '$NEW_REG' not in d['insecure-registries']:
+    d['insecure-registries'].append('$NEW_REG')
+    with open('$CFG', 'w') as f:
+        json.dump(d, f, indent=2)
+    print('changed')
+  " | grep -q changed && CHANGED=1
+fi
+if [ "$CHANGED" = "1" ]; then
+  echo "[fastlio] restarting Docker daemon..."
+  sudo systemctl restart docker
+  sleep 2
+fi
+
+# ── 4. Download + verify ───────────────────────────────────────────────
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-BUNDLE_NAME="fastlio-runtime-${VERSION}"
-BUNDLE_URL="${ARTIFACT_BASE}/artifacts/fastlio/${BUNDLE_NAME}.tar.gz"
+BUNDLE_NAME="fastlio-runtime-${CONFIG}"
+BUNDLE_URL="${ARTIFACT_BASE}/artifacts/fastlio/${CONFIG}/${BUNDLE_NAME}.tar.gz"
 SHA256_URL="${BUNDLE_URL}.sha256"
 
 echo "[fastlio] downloading bundle..."
@@ -69,101 +106,119 @@ echo "[fastlio] verifying sha256..."
   exit 1
 }
 
-# ── 5. Extract to releases/ ──────────────────────────────────────────────
-RELEASE_DIR="${RUNTIME_ROOT}/releases/${VERSION}"
-mkdir -p "$RUNTIME_ROOT/releases"
-tar xzf "$TMP_DIR/$BUNDLE_NAME.tar.gz" -C "$RUNTIME_ROOT/releases/"
-echo "[fastlio] extracted to $RELEASE_DIR"
+# ── 5. Extract ────────────────────────────────────────────────────────
+mkdir -p "$RUNTIME_ROOT"
+rm -rf "${RUNTIME_ROOT}/config" "${RUNTIME_ROOT}/launch" "${RUNTIME_ROOT}/scripts" "${RUNTIME_ROOT}/rviz" "${RUNTIME_ROOT}/PCD"
+tar xzf "$TMP_DIR/$BUNDLE_NAME.tar.gz" --strip-components=1 -C "$RUNTIME_ROOT"
+echo "[fastlio] extracted to $RUNTIME_ROOT"
 
-# ── 6. Switch current symlink ────────────────────────────────────────────
-PREVIOUS=$(readlink -f "$RUNTIME_ROOT/current" 2>/dev/null || echo "")
-ln -sfn "$RELEASE_DIR" "$RUNTIME_ROOT/current"
-if [[ -n "$PREVIOUS" && "$PREVIOUS" != "$RELEASE_DIR" ]]; then
-  ln -sfn "$PREVIOUS" "${RUNTIME_ROOT}/previous" 2>/dev/null || true
-fi
-echo "[fastlio] current -> $VERSION"
+# ── 6. Cache bundle for rollback ────────────────────────────────────────
+mkdir -p "${RUNTIME_ROOT}/releases"
+cp "$TMP_DIR/$BUNDLE_NAME.tar.gz" "${RUNTIME_ROOT}/releases/${BUNDLE_NAME}.tar.gz"
 
-# ── 7. Read manifest ─────────────────────────────────────────────────────
-MANIFEST="${RUNTIME_ROOT}/current/manifest.yaml"
+# ── 7. Read manifest ───────────────────────────────────────────────────
+MANIFEST="${RUNTIME_ROOT}/manifest.yaml"
 if [[ ! -f "$MANIFEST" ]]; then
-  echo "[fastlio] ERROR: manifest.yaml not found in bundle"
+  echo "[fastlio] ERROR: manifest.yaml not found"
   exit 1
 fi
 
 IMAGE=$(grep -E '^\s*image:' "$MANIFEST" | awk '{print $2}')
-ENTRYPOINT_TEMPLATE=$(grep -E '^\s*entrypoint:' "$MANIFEST" | head -1 | sed 's/.*entrypoint: //')
-FLAGS=$(awk '/^  flags:/{f=1;next} f{ if(/^    - /){print $2} else {exit} }' "$MANIFEST")
-VOLUMES=$(awk '/^  volumes:/{f=1;next} f{ if(/^    - /){print $2} else {exit} }' "$MANIFEST")
+echo "[fastlio] image: $IMAGE"
 
-# Substitute template vars
-ENTRYPOINT=$(echo "$ENTRYPOINT_TEMPLATE" | sed "s/{hardware}/$HARDWARE/g; s/{imu_src}/$IMU_SRC/g")
-echo "[fastlio] image:       $IMAGE"
-echo "[fastlio] entrypoint:  $ENTRYPOINT"
-
-# ── 8. Docker pull ───────────────────────────────────────────────────────
+# ── 8. Docker pull ─────────────────────────────────────────────────────
 echo "[fastlio] pulling image..."
 docker pull "$IMAGE"
 
-# ── 9. Stop old container ────────────────────────────────────────────────
+# Verify image digest
+EXPECTED_DIGEST=$(grep -E '^\s*digest:' "$MANIFEST" | awk '{print $2}')
+if [[ -n "$EXPECTED_DIGEST" ]]; then
+  echo "[fastlio] verifying image digest..."
+  ACTUAL_DIGEST=$(docker image inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null | cut -d@ -f2)
+  if [[ "$EXPECTED_DIGEST" != "$ACTUAL_DIGEST" ]]; then
+    echo "[fastlio] ERROR: digest mismatch"
+    echo "  expected: $EXPECTED_DIGEST"
+    echo "  actual:   $ACTUAL_DIGEST"
+    exit 1
+  fi
+fi
+
+# ── 9. Stop old container ──────────────────────────────────────────────
 if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
   echo "[fastlio] stopping old container..."
   docker stop "$CONTAINER_NAME" 2>/dev/null || true
   docker rm "$CONTAINER_NAME" 2>/dev/null || true
 fi
 
-# ── 10. Start new container ──────────────────────────────────────────────
+# ── 10. Start new container ────────────────────────────────────────────
 echo "[fastlio] starting container..."
-# shellcheck disable=SC2086
 docker run -d \
   --name "$CONTAINER_NAME" \
-  $FLAGS \
-  $VOLUMES \
-  -v "$(dirname "$RUNTIME_ROOT/current")/$(readlink "$RUNTIME_ROOT/current")/config:/catkin_ws/src/bringup/config:ro" \
-  -v "$(dirname "$RUNTIME_ROOT/current")/$(readlink "$RUNTIME_ROOT/current")/launch:/catkin_ws/src/bringup/launch:ro" \
-  -v "$(dirname "$RUNTIME_ROOT/current")/$(readlink "$RUNTIME_ROOT/current")/scripts:/catkin_ws/src/bringup/scripts:ro" \
-  -v "/opt/fastlio/data/PCD:/catkin_ws/src/fast_lio/PCD" \
-  -v "/opt/fastlio/data/logs:/root/.ros/log" \
+  --network host --ipc host --privileged \
+  -v "${RUNTIME_ROOT}/config:/catkin_ws/src/bringup/config:ro" \
+  -v "${RUNTIME_ROOT}/launch:/catkin_ws/src/bringup/launch:ro" \
+  -v "${RUNTIME_ROOT}/scripts:/catkin_ws/src/bringup/scripts:ro" \
+  -v "${RUNTIME_ROOT}/PCD:/catkin_ws/src/bringup/PCD" \
+  -v "${RUNTIME_ROOT}/data/logs:/root/.ros/log" \
   "$IMAGE" \
-  $ENTRYPOINT
+  roslaunch bringup slam.launch
 
 CID=$(docker ps -lq)
 echo "[fastlio] container started: ${CID:0:12}"
 
-# ── 11. Health check ─────────────────────────────────────────────────────
-echo "[fastlio] waiting for SLAM ready signal..."
-HEALTH_OK=0
-for i in $(seq 1 10); do
-  if docker exec "$CONTAINER_NAME" test -f /tmp/slam_ready 2>/dev/null; then
-    HEALTH_OK=1
+# ── 11. L1 smoke test ──────────────────────────────────────────────────
+echo ""
+echo "[fastlio] running L1 smoke test (LiDAR + IMU)..."
+SMOKE_OK=0
+for i in $(seq 1 15); do
+  if docker exec "$CONTAINER_NAME" bash /catkin_ws/src/bringup/scripts/check-l1.sh 2>/dev/null; then
+    SMOKE_OK=1
     break
   fi
-  sleep 3
+  sleep 6
 done
 
-# ── 12. Summary ──────────────────────────────────────────────────────────
+# ── 12. Summary ────────────────────────────────────────────────────────
 echo ""
 echo "============================================"
 echo " fastlio deployment summary"
 echo "============================================"
+echo " config:      $CONFIG"
 echo " version:     $VERSION"
 echo " image:       $IMAGE"
 echo " container:   $CONTAINER_NAME (${CID:0:12})"
-echo " hardware:    $HARDWARE"
-echo " imu_src:     $IMU_SRC"
-if [[ "$HEALTH_OK" == "1" ]]; then
-  echo " health:      OK"
+echo " runtime:     $RUNTIME_ROOT"
+if [[ "$SMOKE_OK" == "1" ]]; then
+  echo " smoke:       ${GREEN}${BOLD}PASS${RESET}"
+  echo "============================================"
+  echo ""
+  echo "${GREEN}${BOLD}[fastlio] deployment OK${RESET}"
+  docker logs --tail 10 "$CONTAINER_NAME"
+  exit 0
 else
-  echo " health:      WARNING (timeout)"
-fi
-echo " config:      $DEVICE_CONFIG"
-echo " runtime:     $RELEASE_DIR"
-echo "============================================"
-echo ""
-
-if [[ "$HEALTH_OK" != "1" ]]; then
-  echo "[fastlio] WARNING: health check timed out. Last log lines:"
-  docker logs --tail 30 "$CONTAINER_NAME"
+  echo " smoke:       ${RED}${BOLD}FAIL${RESET}"
+  echo "============================================"
+  echo ""
+  echo "${RED}${BOLD}[fastlio] deployment FAILED — smoke check failed${RESET}"
+  echo ""
+  echo "[fastlio] rolling back..."
+  docker stop "$CONTAINER_NAME" 2>/dev/null || true
+  docker rm "$CONTAINER_NAME" 2>/dev/null || true
+  if [[ -f "${RUNTIME_ROOT}/releases/${BUNDLE_NAME}.tar.gz" ]]; then
+    rm -rf "${RUNTIME_ROOT}/config" "${RUNTIME_ROOT}/launch" "${RUNTIME_ROOT}/scripts" "${RUNTIME_ROOT}/rviz"
+    rm -rf "${RUNTIME_ROOT}/config" "${RUNTIME_ROOT}/launch" "${RUNTIME_ROOT}/scripts" "${RUNTIME_ROOT}/rviz" "${RUNTIME_ROOT}/PCD"
+    tar xzf "${RUNTIME_ROOT}/releases/${BUNDLE_NAME}.tar.gz" --strip-components=1 -C "$RUNTIME_ROOT"
+    docker run -d \
+      --name "$CONTAINER_NAME" \
+      --network host --ipc host --privileged \
+      -v "${RUNTIME_ROOT}/config:/catkin_ws/src/bringup/config:ro" \
+      -v "${RUNTIME_ROOT}/launch:/catkin_ws/src/bringup/launch:ro" \
+      -v "${RUNTIME_ROOT}/scripts:/catkin_ws/src/bringup/scripts:ro" \
+      -v "${RUNTIME_ROOT}/PCD:/catkin_ws/src/bringup/PCD" \
+      -v "${RUNTIME_ROOT}/data/logs:/root/.ros/log" \
+      "$IMAGE" \
+      roslaunch bringup slam.launch
+    echo "[fastlio] rolled back to previous container"
+  fi
   exit 1
 fi
-
-docker logs --tail 10 "$CONTAINER_NAME"

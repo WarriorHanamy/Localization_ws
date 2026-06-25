@@ -160,19 +160,18 @@ async function doSmokeL1(hw: string, imu: string, useMavros: boolean): Promise<v
     "--name", containerName, "--network", "host", "--ipc", "host", "--privileged",
     "-v", `${REC_DEVICE_LOC_WS}/bringup:/catkin_ws/src/bringup`,
     DOCKER_IMAGE_BASE,
-    "roslaunch", "bringup", "smoke_l1.launch",
-    `hardware:=${hw}`, `imu_src:=${imu}`, `use_mavros:=${useMavros}`,
+    "roslaunch", "bringup", "smoke-l1.launch",
   ]);
   if (run.exitCode !== 0) { console.error(run.stderr); process.exit(1); }
 
-  console.log(`[smoke] L1(${imu}): running container-smoke-l1.sh (IMU_SRC=${imu}) ...`);
+  console.log(`[smoke] L1(${imu}): running check-l1.sh (IMU_SRC=${imu}) ...`);
   const imuTopic = imu === "mavros" ? "/mavros/imu/data" : "/livox/imu";
   const exec = dockerSpawn([
     "docker", "exec",
     "-e", `SMOKE_IMU_SRC=${imu}`,
     "-e", `SMOKE_IMU_TOPIC=${imuTopic}`,
     containerName,
-    "bash", "/catkin_ws/src/bringup/scripts/container-smoke-l1.sh",
+    "bash", "/catkin_ws/src/bringup/scripts/check-l1.sh",
   ]);
 
   const results = parseResults(exec.stdout);
@@ -223,7 +222,7 @@ function l2Container(session: string, containerName: string, image: string, laun
     "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
     "-v", `${REC_DEVICE_LOC_WS}/bringup:/catkin_ws/src/bringup`,
     image,
-    "roslaunch", "bringup", launch, `hardware:=${hw}`, `imu_src:=${imu}`,
+    "roslaunch", "bringup", launch,
   ]);
   if (dockerRun.exitCode !== 0) { console.error(dockerRun.stderr.toString()); process.exit(1); }
 
@@ -241,13 +240,13 @@ function l2Container(session: string, containerName: string, image: string, laun
 // ---- L2 handlers ----
 
 function doSmokeL2Slam(hw: string, imu: string): void {
-  l2Container(`l2-slam-${imu}`, `fastlio-l2-slam-${imu}`, DOCKER_IMAGE_SLAM, "smoke_l2_slam.launch", hw, imu,
-    `${REC_DEVICE_LOC_WS}/bringup/rviz_cfg/smoke_l2_fov.rviz`);
+  l2Container(`l2-slam-${imu}`, `fastlio-l2-slam-${imu}`, DOCKER_IMAGE_SLAM, "smoke-l2-slam.launch", hw, imu,
+    `${REC_DEVICE_LOC_WS}/bringup/rviz_cfg/fov.rviz`);
 }
 
 function doSmokeL2Fov(hw: string, imu: string): void {
-  l2Container(`l2-fov-${imu}`, `fastlio-l2-fov-${imu}`, DOCKER_IMAGE_SLAM, "smoke_l2_fov.launch", hw, imu,
-    `${REC_DEVICE_LOC_WS}/bringup/rviz_cfg/smoke_l2_fov.rviz`);
+  l2Container(`l2-fov-${imu}`, `fastlio-l2-fov-${imu}`, DOCKER_IMAGE_SLAM, "smoke-l2-fov.launch", hw, imu,
+    `${REC_DEVICE_LOC_WS}/bringup/rviz_cfg/fov.rviz`);
 }
 
 function doSmokeL2Calib(platform?: string): void {

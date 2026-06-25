@@ -1,0 +1,13 @@
+<launch>
+  <arg name="bd_list" default="000000000000000"/>
+
+  <include file="$(find bringup)/launch/livox.launch">
+    <arg name="bd_list" value="$(arg bd_list)"/>
+  </include>
+  <include file="$(find bringup)/launch/mapping-reloc.launch"/>
+  <rosparam command="load" file="$(find bringup)/config/align.yaml"/>
+  <param name="initial_align/Init_Body_pos_x" type="double" value="0.0"/>
+  <param name="initial_align/Init_Body_pos_y" type="double" value="0.0"/>
+  <param name="initial_align/Init_Body_pos_z" type="double" value="0.0"/>
+  <node pkg="fast_lio" type="initial_align" name="initial_align" output="screen"/>
+</launch>

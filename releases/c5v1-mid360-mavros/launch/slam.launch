@@ -1,0 +1,8 @@
+<launch>
+  <arg name="bd_list" default="000000000000000"/>
+
+  <include file="$(find bringup)/launch/livox.launch">
+    <arg name="bd_list" value="$(arg bd_list)"/>
+  </include>
+  <include file="$(find bringup)/launch/mapping.launch"/>
+</launch>

@@ -1,0 +1,11 @@
+<launch>
+  <arg name="fcu_url" default="/dev/ttyTHS0:921600" doc="MAVROS FCU serial device"/>
+
+  <include file="$(find bringup)/launch/livox.launch">
+    <arg name="xfer_format" value="1"/>
+  </include>
+
+  <include file="$(find mavros)/launch/px4.launch">
+    <arg name="fcu_url" value="$(arg fcu_url)"/>
+  </include>
+</launch>

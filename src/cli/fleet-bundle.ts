@@ -1,15 +1,21 @@
 import { $ } from "bun";
-import { DOCKER_IMAGE_TAG, ARTIFACT_SRV_DIR } from "../core/config";
+import { DOCKER_IMAGE_TAG, ARTIFACT_SRV_DIR, RELEASE_CONFIGS, type ReleaseConfig } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 import { getDevelHostLANIP } from "../core/network";
 import { createHash } from "crypto";
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 
-export async function cmdFleetBundle(versionArg?: string) {
+export async function cmdFleetBundle(config?: string, versionArg?: string) {
+  if (!config || !(RELEASE_CONFIGS as unknown as string[]).includes(config)) {
+    console.error("[fleet-bundle] Usage: bun run fleet-bundle <config> [version]");
+    console.error(`  Configs: ${RELEASE_CONFIGS.join(", ")}`);
+    process.exit(1);
+  }
+
   const repo = getRepoRoot();
   const version = versionArg || DOCKER_IMAGE_TAG;
-  const bundleName = `fastlio-runtime-${version}`;
+  const bundleName = `fastlio-runtime-${config}`;
 
   const lanIP = getDevelHostLANIP();
   if (!lanIP) {
@@ -18,7 +24,7 @@ export async function cmdFleetBundle(versionArg?: string) {
   }
   const imageRef = `${lanIP}:5000/lio-slam:${version}`;
 
-  const artifactDir = join(ARTIFACT_SRV_DIR, "artifacts", "fastlio");
+  const artifactDir = join(ARTIFACT_SRV_DIR, "artifacts", "fastlio", config);
   const tarballPath = join(artifactDir, `${bundleName}.tar.gz`);
   mkdirSync(artifactDir, { recursive: true });
 
@@ -28,23 +34,35 @@ export async function cmdFleetBundle(versionArg?: string) {
   }
   mkdirSync(stagingDir, { recursive: true });
 
-  console.log(`[fleet-bundle] packaging bringup/ → ${bundleName} ...`);
+  console.log(`[fleet-bundle] packaging releases/${config}/ → ${bundleName} ...`);
 
-  await $`cp -r ${repo}/bringup/launch ${stagingDir}/launch`;
-  await $`cp -r ${repo}/bringup/config ${stagingDir}/config`;
-  await $`cp -r ${repo}/bringup/scripts ${stagingDir}/scripts`;
-  if (existsSync(`${repo}/bringup/rviz_cfg`)) {
-    await $`cp -r ${repo}/bringup/rviz_cfg ${stagingDir}/rviz_cfg`;
-  }
-  if (existsSync(`${repo}/bringup/resource/MANIFEST`)) {
-    mkdirSync(`${stagingDir}/resource`, { recursive: true });
-    await $`cp ${repo}/bringup/resource/MANIFEST ${stagingDir}/resource/MANIFEST`;
+  // Copy entire release config
+  const srcDir = join(repo, "releases", config);
+  for (const sub of ["launch", "config", "scripts", "rviz", "PCD"]) {
+    if (existsSync(join(srcDir, sub))) {
+      mkdirSync(join(stagingDir, sub), { recursive: true });
+      await $`cp -r ${join(srcDir, sub)}/. ${join(stagingDir, sub)}/`;
+    }
   }
 
+  // Query registry for image digest
+  let digest = "";
+  try {
+    const digestUrl = `http://${lanIP}:5000/v2/lio-slam/manifests/${version}`;
+    const res = await fetch(digestUrl, {
+      headers: { "Accept": "application/vnd.docker.distribution.manifest.v2+json" },
+    });
+    const d = res.headers.get("Docker-Content-Digest");
+    if (d) digest = d;
+  } catch { /* digest optional */ }
+
+  // Generate manifest
   const manifest = [
     `name: fastlio`,
+    `config: ${config}`,
     `version: ${version}`,
     `image: ${imageRef}`,
+    ...(digest ? [`digest: ${digest}`] : []),
     `container:`,
     `  name: fastlio-runtime`,
     `  flags:`,
@@ -52,16 +70,12 @@ export async function cmdFleetBundle(versionArg?: string) {
     `    - --ipc host`,
     `    - --privileged`,
     `  volumes:`,
-    `    - /opt/fastlio/runtime/current/config:/catkin_ws/src/bringup/config:ro`,
-    `    - /opt/fastlio/runtime/current/launch:/catkin_ws/src/bringup/launch:ro`,
-    `    - /opt/fastlio/runtime/current/scripts:/catkin_ws/src/bringup/scripts:ro`,
-    `    - /opt/fastlio/runtime/current/rviz_cfg:/catkin_ws/src/bringup/rviz_cfg:ro`,
-    `    - /opt/fastlio/data/PCD:/catkin_ws/src/fast_lio/PCD`,
-    `    - /opt/fastlio/data/logs:/root/.ros/log`,
-    `  entrypoint: roslaunch bringup {hardware}_slam.launch imu_src:={imu_src}`,
-    `entrypoint:`,
-    `  startup_timeout_sec: 30`,
-    `  health_poll_interval_sec: 3`,
+    `    - $HOME/opt/fastlio/config:/catkin_ws/src/bringup/config:ro`,
+    `    - $HOME/opt/fastlio/launch:/catkin_ws/src/bringup/launch:ro`,
+    `    - $HOME/opt/fastlio/scripts:/catkin_ws/src/bringup/scripts:ro`,
+    `    - $HOME/opt/fastlio/PCD:/catkin_ws/src/bringup/PCD`,
+    `    - $HOME/opt/fastlio/data/logs:/root/.ros/log`,
+    `  entrypoint: roslaunch bringup slam.launch`,
     ``,
   ].join("\n");
   writeFileSync(join(stagingDir, "manifest.yaml"), manifest);
@@ -69,7 +83,7 @@ export async function cmdFleetBundle(versionArg?: string) {
   // Create tarball
   await $`tar czf ${tarballPath} -C ${join(repo, ".fleet-bundle")} ${bundleName}`;
 
-  // Generate sha256 in sha256sum -c compatible format
+  // Generate sha256
   const sha256 = createHash("sha256").update(readFileSync(tarballPath)).digest("hex");
   writeFileSync(`${tarballPath}.sha256`, `${sha256}  ${bundleName}.tar.gz\n`);
 
@@ -81,6 +95,7 @@ export async function cmdFleetBundle(versionArg?: string) {
 
   console.log(`[fleet-bundle] Bundle:  ${tarballPath}`);
   console.log(`[fleet-bundle] SHA256:  ${tarballPath}.sha256`);
-  console.log(`[fleet-bundle] Latest:  ${version}`);
+  console.log(`[fleet-bundle] Config:  ${config}`);
+  console.log(`[fleet-bundle] Version: ${version}`);
   console.log(`[fleet-bundle] Image:   ${imageRef}`);
 }

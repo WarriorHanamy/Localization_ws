@@ -23,7 +23,7 @@ description: Clarify the five runtime entities (dev-host, dev-device, fleet-devi
 | Code path           | `bun run sync` (rsync over USB)           | `curl ... | bash` bootstrap script            |
 | Runtime config      | `bun run sync` bringup/ (bind-mount)      | `wget` runtime bundle from HTTP `:8080`       |
 | Image path          | `docker build` locally, then push         | `docker pull` from dev-host registry `:5000`  |
-| Runtime control     | dev-host SSH starts/stops/monitors        | Autonomous via `/opt/fastlio/bin/fastlio-ctl`  |
+| Runtime control     | dev-host SSH starts/stops/monitors        | Autonomous via `$HOME/opt/fastlio/bin/fastlio-ctl`  |
 | Builds images       | Yes (sole build node)                     | No                                             |
 | RViz visualization  | Yes (via NoMachine to `:0`)               | No                                             |
 | Bootstrap           | `bun run sync && bun run prod`            | `curl -fsSL http://<ip>:8080/install/fastlio \| bash` |
@@ -97,9 +97,9 @@ dev-device ──docker push──>  registry on dev-host (:5443)  ──docker 
 ```
 
 Fleet-devices use a one-line bootstrap script (`curl ... | bash`) that:
-1. Reads local hardware config (`/opt/fastlio/etc/device.yaml`)
+1. Reads local hardware config (`$HOME/opt/fastlio/etc/device.yaml`)
 2. Downloads + verifies runtime bundle from artifact server `:8080`
-3. Extracts to `/opt/fastlio/runtime/releases/<version>/`
+3. Extracts to `$HOME/opt/fastlio/runtime/releases/<version>/`
 4. Switches `current` symlink
 5. Reads `manifest.yaml` → determines image tag + docker run args
 6. `docker pull` from dev-host registry `:5000`
@@ -226,6 +226,6 @@ The bootstrap script checks this file via `docker exec` after container start.
 | Config source   | `bun run sync` (rsync)                              | Runtime bundle via HTTP `:8080` (`curl | bash`)    |
 | Bootstrap       | `bun run sync && bun run docker-dbuild && bun run prod` | `curl -fsSL http://<lan-ip>:8080/install/fastlio \| bash` |
 | Runtime control | `bun run prod` via SSH tunneling                     | `docker stop/start fastlio-runtime` 或 `fastlio-ctl` |
-| Device config   | N/A (args passed via SSH CLI)                       | `/opt/fastlio/etc/device.yaml` (hardware, imu_src) |
+| Device config   | N/A (args passed via SSH CLI)                       | `$HOME/opt/fastlio/etc/device.yaml` (hardware, imu_src) |
 | Logging         | `tee -a` to `logs/`, readable over SSH               | Local Docker logs + MQTT telemetry                 |
 | RViz            | Renders on Jetson `:0`, viewed via NoMachine         | Not used                                           |

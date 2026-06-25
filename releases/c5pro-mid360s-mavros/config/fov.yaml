@@ -1,0 +1,11 @@
+map:
+  incremental: true
+  save_on_exit: true
+  save_file: smoke_test_map.pcd
+pcd_save:
+  pcd_save_en: false
+  interval: -1
+publish:
+  fov_yaw_offset_deg: 0.0
+prior_local:
+  enable: false

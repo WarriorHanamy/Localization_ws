@@ -20,10 +20,10 @@ Commands:
   attach             Attach to production tmux session
   status             Show production status
 
-Recipe naming: <hardware>-<service>-<imu_src>
-  hardware: c5v1 | c5pro
-  imu_src:  livox | mavros
-  example:  c5v1-mavros-map, c5pro-livox-reloc, c5v1-mavros
+Recipe naming: <config>[-<mode>]
+  config: c5v1-mid360-{mavros,livox} | c5pro-mid360s-{mavros,livox}
+  mode:   (empty for slam), map, reloc
+  example: c5v1-mid360-mavros-map, c5pro-mid360s-livox-reloc
 
 Recipes:
 ${Object.entries(RECIPES).map(([k, v]) => `  ${k.padEnd(28)} ${v.desc}`).join("\n")}
@@ -73,7 +73,7 @@ async function doStart(recipeName: string): Promise<void> {
     console.error(USAGE);
     process.exit(1);
   }
-  const { launch, imu_src } = recipe;
+  const { launch } = recipe;
   const container = containerName(recipeName);
 
   mkdirSync(PROD_LOGS, { recursive: true });
@@ -83,7 +83,7 @@ async function doStart(recipeName: string): Promise<void> {
   spawn(["docker", "stop", container], { stderr: "ignore" });
   spawn(["docker", "rm", container], { stderr: "ignore" });
 
-  console.log(`[prod] Starting container '${container}' (${launch}, imu=${imu_src}) ...`);
+  console.log(`[prod] Starting container '${container}' (${launch}) ...`);
   const dockerArgs: string[] = [
     "docker", "run", "-d",
     "--name", container,
@@ -98,7 +98,7 @@ async function doStart(recipeName: string): Promise<void> {
   dockerArgs.push(
     "-v", `${WORKSPACE}/bringup:/catkin_ws/src/bringup`,
     DOCKER_IMAGE_SLAM,
-    "roslaunch", "bringup", launch, `imu_src:=${imu_src}`,
+    "roslaunch", "bringup", launch,
   );
 
   const dockerRun = spawn(dockerArgs);

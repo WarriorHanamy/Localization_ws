@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find bringup)/launch/livox.launch">
+    <arg name="xfer_format" value="1"/>
+  </include>
+</launch>
