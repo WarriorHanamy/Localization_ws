@@ -1,4 +1,4 @@
-import { RECIPES, type RecipeName, DOCKER_IMAGE, REMOTE_HOST_USB, REMOTE_USER, SSH_OPTS, REC_DEVICE_LOC_WS } from "../core/config";
+import { RECIPES, type RecipeName, DOCKER_IMAGE_SLAM, REMOTE_HOST_USB, REMOTE_USER, SSH_OPTS, REC_DEVICE_LOC_WS } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 import { mkdirSync } from "fs";
 import { $ } from "bun";
@@ -97,7 +97,7 @@ async function doStart(recipeName: string): Promise<void> {
   }
   dockerArgs.push(
     "-v", `${WORKSPACE}/bringup:/catkin_ws/src/bringup`,
-    DOCKER_IMAGE,
+    DOCKER_IMAGE_SLAM,
     "roslaunch", "bringup", launch, `imu_src:=${imu_src}`,
   );
 

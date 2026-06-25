@@ -14,6 +14,7 @@
     "view:fastlio": "bun run src/cli/view-fastlio.ts",
     "smoke": "bun src/cli/index.ts smoke",
     "doc": "bun src/cli/index.ts doc",
+    "status": "bun src/cli/index.ts status",
     "docker-dbuild": "bun src/cli/index.ts docker-dbuild",
     "docker-push": "bun src/cli/index.ts docker-push",
     "docker-start": "bun src/cli/index.ts docker-start",

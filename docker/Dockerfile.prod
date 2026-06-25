@@ -1,4 +1,4 @@
-FROM fastlio-base:latest
+FROM nx/lio-base:latest
 
 # Layer 1 — stable SLAM packages (rarely changed)
 COPY ekf_quat_pose/     /catkin_ws/src/ekf_quat_pose/

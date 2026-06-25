@@ -15,6 +15,40 @@
   #status .dot.on { background: #3fb950; }
   #status .dot.off { background: #da3633; }
   #status .count { color: #8b949e; }
+  .components { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .component {
+    background: #0f141b; border: 1px solid #30363d; border-radius: 8px;
+    padding: 10px 12px; min-width: 0;
+  }
+  .component .name { font-size: 11px; text-transform: uppercase; color: #8b949e; margin-bottom: 5px; }
+  .component .state { font-size: 13px; font-weight: 600; color: #f0f6fc; }
+  .component .detail { font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .component.ok { border-color: #238636; }
+  .component.bad { border-color: #da3633; }
+  .component.ok .state { color: #3fb950; }
+  .component.bad .state { color: #ff7b72; }
+  .script-panel {
+    background: #0f141b; border: 1px solid #30363d; border-radius: 8px;
+    margin-bottom: 20px; overflow: hidden;
+  }
+  .script-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border-bottom: 1px solid #30363d;
+  }
+  .script-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); }
+  .script-item { border-right: 1px solid #30363d; min-width: 0; }
+  .script-item:last-child { border-right: 0; }
+  .script-title { font-size: 12px; text-transform: uppercase; color: #8b949e; }
+  .script-copy {
+    background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
+    border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 12px;
+    cursor: pointer;
+  }
+  .script-copy:hover { background: #30363d; }
+  pre {
+    padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.5;
+    color: #d1d7e0; white-space: pre;
+  }
   .cards { display: flex; gap: 12px; margin-bottom: 20px; }
   .card {
     background: #161b22; border: 1px solid #30363d; border-radius: 8px;
@@ -32,11 +66,21 @@
   tr:hover { background: #161b22; }
   .empty { color: #8b949e; text-align: center; padding: 40px 0; font-size: 14px; }
   .footer { margin-top: 12px; font-size: 11px; color: #484f58; }
+  @media (max-width: 760px) {
+    .components, .cards { grid-template-columns: 1fr; display: grid; }
+    .script-grid { grid-template-columns: 1fr; }
+    .script-item { border-right: 0; border-bottom: 1px solid #30363d; }
+    .script-item:last-child { border-bottom: 0; }
+  }
 </style>
 </head>
 <body>
 <h1>Registry Pull Tracker</h1>
 <div id="status"><span class="dot off" id="dot"></span><span id="statusText">connecting...</span></div>
+<div class="components" id="components"></div>
+<div class="script-panel">
+  <div class="script-grid" id="pullScripts"></div>
+</div>
 <div class="cards">
   <div class="card"><div class="label">Total Pulls</div><div class="value" id="total">-</div></div>
   <div class="card"><div class="label">Unique IPs</div><div class="value" id="unique">-</div></div>
@@ -52,6 +96,8 @@
 const TBODY = document.getElementById("tbody");
 const DOT = document.getElementById("dot");
 const STATUSTEXT = document.getElementById("statusText");
+const COMPONENTS = document.getElementById("components");
+const PULLSCRIPTS = document.getElementById("pullScripts");
 
 function parseImageTag(path) {
   const m = path.match(/\/v2\/(.+?)\/(?:manifests|tags\/list)(?:\/(.+))?$/);
@@ -69,15 +115,34 @@ function ago(ts) {
   return Math.floor(s / 86400) + "d ago";
 }
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[ch]));
+}
+
 async function refresh() {
   DOT.className = "dot off";
   STATUSTEXT.textContent = "loading...";
   try {
-    const res = await fetch("/api/pulls");
+    const [statusRes, res] = await Promise.all([
+      fetch("/api/status"),
+      fetch("/api/pulls"),
+    ]);
+    if (!statusRes.ok) throw new Error("status " + statusRes.status);
     if (!res.ok) throw new Error(String(res.status));
+    const status = await statusRes.json();
     const data = await res.json();
-    DOT.className = "dot on";
-    STATUSTEXT.textContent = "live (" + data.length + " entries)";
+    renderComponents(status);
+    renderPullScript(status);
+
+    const allOk = Object.values(status.components).every(c => c.ok);
+    DOT.className = "dot " + (allOk ? "on" : "off");
+    STATUSTEXT.textContent = (allOk ? "live" : "degraded") + " (" + data.length + " entries)";
 
     const pulls = data.filter(e => e.method === "GET");
     document.getElementById("total").textContent = pulls.length;
@@ -103,6 +168,93 @@ async function refresh() {
     STATUSTEXT.textContent = "error: " + err.message;
   }
 }
+
+function renderComponents(status) {
+  const items = [
+    ["Fleet proxy", status.components.tracker],
+    ["Registry container", status.components.registryContainer],
+    ["Direct registry", status.components.upstream],
+    ["Image tags", status.components.images],
+  ];
+  COMPONENTS.innerHTML = items.map(([name, component]) => {
+    const cls = component.ok ? "ok" : "bad";
+    const state = component.ok ? "OK" : "Check";
+    const detail = escapeHtml(component.detail || "");
+    return `<div class="component ${cls}"><div class="name">${name}</div><div class="state">${state}</div><div class="detail" title="${detail}">${detail}</div></div>`;
+  }).join("");
+}
+
+function scriptForImage(registry, image) {
+  return [
+    "#!/usr/bin/env bash",
+    "set -euo pipefail",
+    "",
+    `REGISTRY="${registry}"`,
+    `IMAGE="${image}"`,
+    "",
+    'echo "[fleet] registry: ${REGISTRY}"',
+    'curl -fsS "http://${REGISTRY}/v2/" >/dev/null',
+    'docker pull "${REGISTRY}/${IMAGE}"',
+    'docker image inspect "${REGISTRY}/${IMAGE}" >/dev/null',
+    'echo "[fleet] pull ok: ${REGISTRY}/${IMAGE}"',
+  ].join("\n");
+}
+
+function renderPullScript(status) {
+  const fleet = status.endpoints.fleet || "http://<dev-host-ip>:5000";
+  const registry = fleet.replace(/^https?:\/\//, "");
+  const images = status.images || [
+    { label: "Base", image: "nx/lio-base:latest" },
+    { label: "SLAM", image: "nx/lio-slam:latest" },
+    { label: "Calib", image: "nx/lio-calib:latest" },
+  ];
+  PULLSCRIPTS.innerHTML = images.map((item, index) => {
+    const script = scriptForImage(registry, item.image);
+    return [
+      '<div class="script-item">',
+      '<div class="script-head">',
+      `<div class="script-title">${escapeHtml(item.label)} pull</div>`,
+      `<button class="script-copy" data-copy-index="${index}">Copy</button>`,
+      "</div>",
+      `<pre data-script-index="${index}">${escapeHtml(script)}</pre>`,
+      "</div>",
+    ].join("");
+  }).join("");
+}
+
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.position = "fixed";
+  area.style.left = "-9999px";
+  area.style.top = "0";
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(area);
+  if (!ok) throw new Error("copy failed");
+}
+
+PULLSCRIPTS.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-copy-index]");
+  if (!button) return;
+  const index = button.getAttribute("data-copy-index");
+  const pre = PULLSCRIPTS.querySelector(`[data-script-index="${index}"]`);
+  if (!pre) return;
+  try {
+    await copyText(pre.textContent);
+    button.textContent = "Copied";
+    setTimeout(() => { button.textContent = "Copy"; }, 1200);
+  } catch {
+    button.textContent = "Select";
+    setTimeout(() => { button.textContent = "Copy"; }, 1200);
+  }
+});
 
 refresh();
 setInterval(refresh, 5000);

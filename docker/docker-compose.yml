@@ -20,7 +20,7 @@ x-env: &env
 services:
   l1:
     <<: *common
-    image: fastlio-base:latest
+    image: nx/lio-base:latest
     container_name: fastlio-l1-${HARDWARE:-c5v1}-${IMU_SRC:-mavros}
     command: roslaunch bringup smoke_l1.launch
              hardware:=${HARDWARE:-c5v1} imu_src:=${IMU_SRC:-mavros} use_mavros:=${USE_MAVROS:-true}
@@ -29,7 +29,7 @@ services:
 
   l2-slam:
     <<: *common
-    image: fastlio-jetson:latest
+    image: nx/lio-slam:latest
     container_name: fastlio-l2-slam-${HARDWARE:-c5v1}-${IMU_SRC:-mavros}
     environment:
       - DISPLAY=${DISPLAY:-:0}
@@ -40,7 +40,7 @@ services:
 
   l2-fov:
     <<: *common
-    image: fastlio-jetson:latest
+    image: nx/lio-slam:latest
     container_name: fastlio-l2-fov-${HARDWARE:-c5v1}-${IMU_SRC:-mavros}
     environment:
       - DISPLAY=${DISPLAY:-:0}
@@ -51,7 +51,7 @@ services:
 
   l2-calib:
     <<: *common
-    image: fastlio-calib:latest
+    image: nx/lio-calib:latest
     container_name: fastlio-l2-calib
     environment:
       - DISPLAY=${DISPLAY:-:0}

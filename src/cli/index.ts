@@ -11,6 +11,7 @@ import { cmdDockerPush } from "./docker-push";
 import { cmdRegistry } from "./registry";
 import { cmdProd } from "./prod";
 import { cmdDoc } from "./doc";
+import { cmdStatus } from "./status";
 import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
@@ -36,9 +37,9 @@ Commands:
   doc pipeline [recipe]          open entity-centric recipe pipelines
 
 Docker commands:
-  docker-dbuild              build fastlio-jetson (base → prod) on Jetson (SSH)
-  docker-dbuild base         build fastlio-base only
-  docker-dbuild calib        build fastlio-calib (base → calib) on Jetson (SSH)
+  docker-dbuild              build nx/lio-slam (base → prod) on Jetson (SSH)
+  docker-dbuild base         build nx/lio-base only
+  docker-dbuild calib        build nx/lio-calib (base → calib) on Jetson (SSH)
   docker-push        push image to local registry (from golden Jetson)
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
@@ -47,6 +48,9 @@ Registry:
   registry start     start registry:2 + pull tracker proxy
   registry stop      stop registry + tracker
   registry status    show registry/tracker status
+
+Status:
+  status fleet       show fleet distribution status and open tracker
 
 Production (tmux + docker):
   prod start --recipe <name>  start production pipeline
@@ -131,6 +135,9 @@ async function main() {
       break;
     case "registry":
       await cmdRegistry(args);
+      break;
+    case "status":
+      await cmdStatus(args);
       break;
     case "prod":
       await cmdProd(args);

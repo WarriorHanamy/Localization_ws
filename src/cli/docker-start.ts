@@ -1,6 +1,6 @@
 import { $ } from "bun";
 import { runSSH, checkSSH } from "../core/ssh";
-import { REC_DEVICE_LOC_WS, RECIPES, type RecipeName } from "../core/config";
+import { DOCKER_IMAGE_SLAM, REC_DEVICE_LOC_WS, RECIPES, type RecipeName } from "../core/config";
 
 const USAGE = `
 Usage: bun run docker-start --recipe <name>
@@ -30,7 +30,7 @@ export async function startContainer(
       `-e DISPLAY=$DISPLAY`,
       `-v /tmp/.X11-unix:/tmp/.X11-unix`,
       `-v ${$.escape(REC_DEVICE_LOC_WS)}/bringup:/catkin_ws/src/bringup`,
-      `fastlio-jetson:latest`,
+      DOCKER_IMAGE_SLAM,
       `roslaunch bringup ${recipe.launch}`,
     ].join(" "),
   ].join("; ");

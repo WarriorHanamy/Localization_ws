@@ -42,7 +42,7 @@ Available subcommands:
 | -------------------- | --------------------------------------------- |
 | `check`              | Verify SSH connectivity + remote toolchain    |
 | `sync`               | rsync workspace to Jetson (incremental)       |
-| `docker-dbuild`      | Build fastlio-jetson image with layered catkin_make on device |
+| `docker-dbuild`      | Build nx/lio-slam image with layered catkin_make on device |
 | `paths`              | Print local/remote workspace paths            |
 | `rviz`               | Launch RViz on Jetson display (via RustDesk)  |
 | `rviz livox`         | Launch RViz with raw LiDAR point cloud        |

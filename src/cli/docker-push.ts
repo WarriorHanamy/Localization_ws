@@ -4,7 +4,7 @@ import { runSSH, runSSHStreaming, checkSSH } from "../core/ssh";
 import {
   REGISTRY_PORT,
   REGISTRY_DIRECT_PORT,
-  DOCKER_IMAGE,
+  DOCKER_IMAGES,
 } from "../core/config";
 import { getDevelHostUSBIP, getDevelHostLANIP } from "../core/network";
 import { REGISTRY_CERT } from "../core/registry-paths";
@@ -30,7 +30,7 @@ async function installRegistryTrust(registryHost: string, registryPort: number) 
 }
 
 export async function cmdDockerPush() {
-  console.log("[docker-push] Pushing fastlio-jetson to registry ...");
+  console.log("[docker-push] Pushing fleet images to registry ...");
 
   // 1. Check SSH to dev-device
   const ok = await checkSSH();
@@ -52,32 +52,43 @@ export async function cmdDockerPush() {
   console.log(`[docker-push] Pushing directly to ${registryHost}:${registryPort}`);
   await installRegistryTrust(registryHost, registryPort);
 
-  // 3. Verify image exists on Jetson
+  // 3. Verify images exist on Jetson
   const checkCmd = [
-    `docker image inspect ${$.escape(DOCKER_IMAGE)} >/dev/null 2>&1`,
-    `echo IMAGE_OK`,
+    "set -euo pipefail",
+    ...DOCKER_IMAGES.map(({ image }) => `docker image inspect ${$.escape(image)} >/dev/null`),
+    `echo IMAGES_OK`,
   ].join("; ");
   const checkResult = await runSSH(checkCmd, false);
-  if (checkResult.exitCode !== 0 || !checkResult.stdout.includes("IMAGE_OK")) {
-    console.log(`[docker-push] Image '${DOCKER_IMAGE}' not found on Jetson.`);
-    console.log("[docker-push] Run 'bun run docker-dbuild' first.");
+  if (checkResult.exitCode !== 0 || !checkResult.stdout.includes("IMAGES_OK")) {
+    console.log("[docker-push] One or more fleet images are missing on Jetson:");
+    for (const { label, image } of DOCKER_IMAGES) {
+      console.log(`  ${label.padEnd(5)} ${image}`);
+    }
+    console.log("[docker-push] Run 'bun run docker-dbuild' and 'bun run docker-dbuild calib' first.");
     process.exit(1);
   }
 
   // 4. Tag and push (direct to registry, bypassing tracker proxy)
-  const tag = `${registryHost}:${registryPort}/${DOCKER_IMAGE}`;
   const pushCmd = [
     "set -euo pipefail",
-    `docker tag ${$.escape(DOCKER_IMAGE)} ${$.escape(tag)}`,
-    `docker push ${$.escape(tag)}`,
+    ...DOCKER_IMAGES.flatMap(({ image }) => {
+      const tag = `${registryHost}:${registryPort}/${image}`;
+      return [
+        `docker tag ${$.escape(image)} ${$.escape(tag)}`,
+        `docker push ${$.escape(tag)}`,
+      ];
+    }),
   ].join("; ");
 
-  console.log(`[docker-push] Tagging and pushing: ${tag} ...`);
+  console.log("[docker-push] Tagging and pushing fleet images ...");
   const exitCode = await runSSHStreaming(pushCmd);
   if (exitCode !== 0) {
     throw new Error(`docker push failed (exit ${exitCode})`);
   }
-  console.log("[docker-push] Image pushed successfully.");
+  console.log("[docker-push] Images pushed successfully.");
   const pullHost = lanIP || registryHost;
-  console.log(`[docker-push] Fleet devices: docker pull ${pullHost}:${REGISTRY_PORT}/${DOCKER_IMAGE}`);
+  console.log("[docker-push] Fleet devices:");
+  for (const { label, image } of DOCKER_IMAGES) {
+    console.log(`  ${label.padEnd(5)} docker pull ${pullHost}:${REGISTRY_PORT}/${image}`);
+  }
 }

@@ -1,9 +1,11 @@
 import {
+  DOCKER_IMAGES,
   REGISTRY_PORT,
   REGISTRY_INTERNAL_PORT,
   TRACKER_LOG,
   MAX_TRACKER_ENTRIES,
 } from "../core/config";
+import { getDevelHostLANIP } from "../core/network";
 import { getRepoRoot } from "../core/workspace";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
@@ -13,6 +15,7 @@ const LOG_FILE = join(getRepoRoot(), TRACKER_LOG);
 const HTML_FILE = join(dirname(fileURLToPath(import.meta.url)), "tracker.html");
 const UPSTREAM = `https://127.0.0.1:${REGISTRY_INTERNAL_PORT}`;
 const UPSTREAM_HOST = `127.0.0.1:${REGISTRY_INTERNAL_PORT}`;
+const REGISTRY_CONTAINER = "loc-registry";
 
 interface PullEntry {
   timestamp: string;
@@ -48,8 +51,8 @@ function addEntry(entry: PullEntry) {
 function isLoggable(method: string, path: string): boolean {
   // Log GET/HEAD manifest and tag-list requests = pull events
   if (method !== "GET" && method !== "HEAD") return false;
-  if (/^\/v2\/[^/]+\/manifests\//.test(path)) return true;
-  if (/^\/v2\/[^/]+\/tags\/list/.test(path)) return true;
+  if (/^\/v2\/.+\/manifests\//.test(path)) return true;
+  if (/^\/v2\/.+\/tags\/list/.test(path)) return true;
   return false;
 }
 
@@ -59,6 +62,78 @@ function loadHtml() {
   } else {
     trackerHtml = "<h1>tracker.html not found</h1>";
   }
+}
+
+function dockerContainerStatus() {
+  const proc = Bun.spawnSync([
+    "docker", "ps",
+    "--filter", `name=${REGISTRY_CONTAINER}`,
+    "--format", "{{.ID}} {{.Status}}",
+  ]);
+  const text = proc.stdout.toString().trim();
+  if (proc.exitCode !== 0) {
+    return { ok: false, detail: "docker unavailable" };
+  }
+  if (!text) {
+    return { ok: false, detail: "container stopped" };
+  }
+  return { ok: true, detail: text };
+}
+
+async function registryStatus() {
+  const lanIP = getDevelHostLANIP();
+  const container = dockerContainerStatus();
+  const status = {
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      fleet: lanIP ? `http://${lanIP}:${REGISTRY_PORT}` : null,
+      tracker: lanIP ? `http://${lanIP}:${REGISTRY_PORT}/tracker` : null,
+      registry: lanIP ? `https://${lanIP}:${REGISTRY_INTERNAL_PORT}` : null,
+    },
+    images: DOCKER_IMAGES,
+    components: {
+      tracker: { ok: true, detail: `listening on :${REGISTRY_PORT}` },
+      registryContainer: container,
+      upstream: { ok: false, detail: "" },
+      images: { ok: false, detail: "" },
+    },
+  };
+
+  try {
+    const res = await fetch(`${UPSTREAM}/v2/`);
+    status.components.upstream = {
+      ok: res.ok,
+      detail: res.ok ? `HTTP ${res.status}` : `HTTP ${res.status}`,
+    };
+  } catch (err) {
+    status.components.upstream = {
+      ok: false,
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  try {
+    const results = await Promise.all(DOCKER_IMAGES.map(async ({ image }) => {
+      const name = image.split(":")[0];
+      const tag = image.split(":")[1] || "latest";
+      const res = await fetch(`${UPSTREAM}/v2/${name}/tags/list`);
+      if (!res.ok) return { image, ok: false, detail: `HTTP ${res.status}` };
+      const body = await res.json() as { tags?: string[] };
+      const tags = body.tags || [];
+      return { image, ok: tags.includes(tag), detail: tags.length ? tags.join(", ") : "no tags" };
+    }));
+    status.components.images = {
+      ok: results.every((result) => result.ok),
+      detail: results.map((result) => `${result.ok ? "OK" : "missing"} ${result.image}`).join("; "),
+    };
+  } catch (err) {
+    status.components.images = {
+      ok: false,
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  return status;
 }
 
 async function main() {
@@ -92,6 +167,10 @@ async function main() {
       // API
       if (path === "/api/pulls") {
         return Response.json(pullLog);
+      }
+
+      if (path === "/api/status") {
+        return Response.json(await registryStatus());
       }
 
       // Proxy to registry

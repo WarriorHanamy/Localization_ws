@@ -1,4 +1,4 @@
-FROM fastlio-base:latest
+FROM nx/lio-base:latest
 
 # Calib-specific dependencies (Ceres solver, not needed in SLAM image)
 RUN apt-get update && apt-get install -y \

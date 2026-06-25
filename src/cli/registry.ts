@@ -144,9 +144,11 @@ async function doStart() {
   }
 
   const proc = Bun.spawn(["bun", "src/web/tracker-server.ts"], {
-    stdio: ["ignore", "inherit", "inherit"] as const,
+    stdio: ["ignore", "ignore", "ignore"] as const,
     env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: "0" },
+    detached: true,
   });
+  proc.unref();
   writeFileSync(PID_FILE, String(proc.pid));
   console.log(`[registry] Tracker started (pid ${proc.pid})`);
   printInfo();
@@ -201,6 +203,15 @@ function doStatus() {
     console.log(`  Fleet:     http://${lanIP}:${REGISTRY_PORT}`);
     console.log(`  Registry:  https://${lanIP}:${REGISTRY_DIRECT_PORT}`);
   }
+}
+
+export function getFleetTrackerUrl(): string | null {
+  const lanIP = getDevelHostLANIP();
+  return lanIP ? `http://${lanIP}:${REGISTRY_PORT}/tracker` : null;
+}
+
+export function cmdRegistryStatus() {
+  doStatus();
 }
 
 function printInfo() {

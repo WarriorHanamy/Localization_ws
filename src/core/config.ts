@@ -61,9 +61,14 @@ export const RSYNC_EXCLUDES = [
   "bringup/resource/",
 ] as const;
 
-export const DOCKER_IMAGE_BASE  = "fastlio-base:latest";
-export const DOCKER_IMAGE       = "fastlio-jetson:latest";
-export const DOCKER_IMAGE_CALIB = "fastlio-calib:latest";
+export const DOCKER_IMAGE_BASE  = "nx/lio-base:latest";
+export const DOCKER_IMAGE_SLAM  = "nx/lio-slam:latest";
+export const DOCKER_IMAGE_CALIB = "nx/lio-calib:latest";
+export const DOCKER_IMAGES = [
+  { key: "base", label: "Base", image: DOCKER_IMAGE_BASE },
+  { key: "slam", label: "SLAM", image: DOCKER_IMAGE_SLAM },
+  { key: "calib", label: "Calib", image: DOCKER_IMAGE_CALIB },
+] as const;
 
 export const RECIPES = {
   // c5v1

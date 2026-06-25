@@ -66,10 +66,10 @@ bun run prod start  # no recipe → opens fzf menu
 | Action                     | Command                          | What it does                                              |
 | -------------------------- | -------------------------------- | --------------------------------------------------------- |
 | **Sync workspace**         | `bun run sync`                   | rsync local workspace to device                           |
-| **Build default image**    | `bun run docker-dbuild`          | Build `fastlio-jetson` (base → prod) on device via SSH    |
-| **Build base image**       | `bun run docker-dbuild base`     | Build `fastlio-base` only                                |
-| **Build calib image**      | `bun run docker-dbuild calib`    | Build `fastlio-calib` (base → calib) on device via SSH   |
-| **Push to registry**       | `bun run docker-push`            | Tag & push `fastlio-jetson` to local registry from golden Jetson |
+| **Build SLAM image**       | `bun run docker-dbuild`          | Build `nx/lio-slam` (base → prod) on device via SSH       |
+| **Build base image**       | `bun run docker-dbuild base`     | Build `nx/lio-base` only                                  |
+| **Build calib image**      | `bun run docker-dbuild calib`    | Build `nx/lio-calib` (base → calib) on device via SSH     |
+| **Push to registry**       | `bun run docker-push`            | Tag & push fleet images to local registry from golden Jetson |
 | **Start container**        | `bun run docker-start <recipe>`  | Start a named container for a recipe                     |
 | **Shell into container**   | `bun run docker-shell <recipe>`  | Exec interactive bash into a running container           |
 
@@ -82,9 +82,10 @@ bun run prod start  # no recipe → opens fzf menu
 | **Start**           | `bun run registry start`        | Start `registry:2` container + pull tracker   |
 | **Stop**            | `bun run registry stop`         | Stop registry + tracker                       |
 | **Status**          | `bun run registry status`       | Show registry container/tracker status        |
+| **Fleet status UI** | `bun run status fleet`          | Show status and open the fleet tracker page   |
 
 Registry runs on the devel host. Direct registry port: `5443`; fleet tracker/proxy port: `5000`.
-Fleet clients pull via `docker pull <lan-ip>:5000/fastlio-jetson:latest`.
+Fleet clients pull via `docker pull <lan-ip>:5000/nx/lio-slam:latest`.
 
 ---
 
@@ -181,7 +182,7 @@ ssh nv@192.168.55.1 'docker exec fastlio-c5pro-mid360s grep ERROR /root/.ros/log
 
 # === BUILD & DEPLOY ===
 bun run sync                     # push code to device
-bun run docker-dbuild            # compile inside container (default image)
+bun run docker-dbuild            # compile SLAM image
 bun run docker-dbuild calib      # compile calib image
 bun run docker-push              # push to local registry
 bun run check                    # verify SSH + remote toolchain
@@ -202,6 +203,7 @@ bun run view:fastlio             # full dashboard + SLAM
 # === REGISTRY ===
 bun run registry start           # start fleet registry
 bun run registry status          # check registry health
+bun run status fleet             # open fleet distribution tracker
 
 # === DASHBOARD ===
 bun run dashboard                # web UI (auto-launch SLAM)

@@ -5,7 +5,7 @@
  */
 import {
   REC_DEVICE_LOC_WS, ROS_DISTRO, REMOTE_USER, REMOTE_HOST_USB, SSH_OPTS,
-  DOCKER_IMAGE_BASE, DOCKER_IMAGE, DOCKER_IMAGE_CALIB, RECIPES, type RecipeName,
+  DOCKER_IMAGE_BASE, DOCKER_IMAGE_CALIB, DOCKER_IMAGE_SLAM, RECIPES, type RecipeName,
 } from "../core/config";
 import { deviceRvizMaximizedCommand, launchNoMachineViewer } from "../core/viewer";
 import { readdirSync, statSync } from "fs";
@@ -241,12 +241,12 @@ function l2Container(session: string, containerName: string, image: string, laun
 // ---- L2 handlers ----
 
 function doSmokeL2Slam(hw: string, imu: string): void {
-  l2Container(`l2-slam-${imu}`, `fastlio-l2-slam-${imu}`, DOCKER_IMAGE, "smoke_l2_slam.launch", hw, imu,
+  l2Container(`l2-slam-${imu}`, `fastlio-l2-slam-${imu}`, DOCKER_IMAGE_SLAM, "smoke_l2_slam.launch", hw, imu,
     `${REC_DEVICE_LOC_WS}/bringup/rviz_cfg/smoke_l2_fov.rviz`);
 }
 
 function doSmokeL2Fov(hw: string, imu: string): void {
-  l2Container(`l2-fov-${imu}`, `fastlio-l2-fov-${imu}`, DOCKER_IMAGE, "smoke_l2_fov.launch", hw, imu,
+  l2Container(`l2-fov-${imu}`, `fastlio-l2-fov-${imu}`, DOCKER_IMAGE_SLAM, "smoke_l2_fov.launch", hw, imu,
     `${REC_DEVICE_LOC_WS}/bringup/rviz_cfg/smoke_l2_fov.rviz`);
 }
 

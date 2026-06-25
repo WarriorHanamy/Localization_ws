@@ -1,12 +1,12 @@
 import { $ } from "bun";
 import { runSSHStreaming, checkSSH, sshTarget } from "../core/ssh";
-import { REC_DEVICE_LOC_WS, SSH_OPTS } from "../core/config";
+import { DOCKER_IMAGE_BASE, DOCKER_IMAGE_CALIB, DOCKER_IMAGE_SLAM, REC_DEVICE_LOC_WS, SSH_OPTS } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
 const TARGETS: Record<string, { dockerfile: string; tag: string; depends?: string }> = {
-  base:    { dockerfile: "docker/Dockerfile.base",  tag: "fastlio-base:latest" },
-  default: { dockerfile: "docker/Dockerfile.prod",  tag: "fastlio-jetson:latest", depends: "base" },
-  calib:   { dockerfile: "docker/Dockerfile.calib", tag: "fastlio-calib:latest", depends: "base" },
+  base:    { dockerfile: "docker/Dockerfile.base",  tag: DOCKER_IMAGE_BASE },
+  slam:    { dockerfile: "docker/Dockerfile.prod",  tag: DOCKER_IMAGE_SLAM, depends: "base" },
+  calib:   { dockerfile: "docker/Dockerfile.calib", tag: DOCKER_IMAGE_CALIB, depends: "base" },
 };
 
 function sdkStageCommands(): string {
@@ -37,7 +37,7 @@ function buildCommand(dockerfile: string, tag: string): string {
 }
 
 async function buildTarget(target: string): Promise<void> {
-  const cfg = TARGETS[target] ?? TARGETS.default;
+  const cfg = TARGETS[target];
   console.log(`[docker-build] Building ${cfg.tag} (${cfg.dockerfile}) ...`);
   const exitCode = await runSSHStreaming(buildCommand(cfg.dockerfile, cfg.tag));
   if (exitCode !== 0) {
@@ -47,7 +47,7 @@ async function buildTarget(target: string): Promise<void> {
 }
 
 export async function cmdDockerBuild(target?: string): Promise<void> {
-  const effective = target ?? "default";
+  const effective = target ?? "slam";
   const cfg = TARGETS[effective];
   if (!cfg) {
     console.error(`[docker-build] Unknown target: ${target}`);
