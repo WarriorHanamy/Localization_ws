@@ -1,6 +1,6 @@
 import { $ } from "bun";
 import { runSSHStreaming, checkSSH, sshTarget } from "../core/ssh";
-import { DOCKER_IMAGE_BASE, DOCKER_IMAGE_CALIB, DOCKER_IMAGE_SLAM, REC_DEVICE_LOC_WS, SSH_OPTS } from "../core/config";
+import { DOCKER_IMAGE_BASE, DOCKER_IMAGE_CALIB, DOCKER_IMAGE_SLAM, RELEASE_CONFIGS, REC_DEVICE_LOC_WS, SSH_OPTS } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 
 const TARGETS: Record<string, { dockerfile: string; tag: string; depends?: string }> = {
@@ -61,5 +61,22 @@ export async function cmdDockerBuild(target?: string): Promise<void> {
     await buildTarget("base");
     await buildTarget("slam");
     await buildTarget("calib");
+  }
+
+  // After building slam (or all targets), push images and regenerate fleet bundles
+  const needsFleetUpdate = !target || target === "slam" || target === "calib";
+  if (needsFleetUpdate && DOCKER_IMAGE_SLAM) {
+    console.log(`[docker-build] Chaining: docker-push → fleet-bundle ...`);
+    const push = await $`bun run docker-push`.quiet().nothrow();
+    if (push.exitCode !== 0) {
+      console.log(`[docker-build] WARNING: docker-push failed (exit ${push.exitCode}), fleet bundles not updated.`);
+      console.log(`  Run manually: bun run docker-push && bun run fleet-bundle <config>`);
+    } else {
+      for (const config of RELEASE_CONFIGS) {
+        console.log(`[docker-build] Generating fleet bundle for ${config} ...`);
+        await $`bun run fleet-bundle ${config}`.quiet().nothrow();
+      }
+      console.log(`[docker-build] Fleet bundles regenerated for all configs.`);
+    }
   }
 }

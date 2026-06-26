@@ -1,5 +1,5 @@
 import { $ } from "bun";
-import { DOCKER_IMAGE_TAG, ARTIFACT_SRV_DIR, RELEASE_CONFIGS, type ReleaseConfig } from "../core/config";
+import { DOCKER_IMAGE_TAG, ARTIFACT_SRV_DIR, RELEASE_CONFIGS, REGISTRY_PORT, REGISTRY_DIRECT_PORT, type ReleaseConfig } from "../core/config";
 import { getRepoRoot } from "../core/workspace";
 import { getDevelHostLANIP } from "../core/network";
 import { createHash } from "crypto";
@@ -46,15 +46,45 @@ export async function cmdFleetBundle(config?: string, versionArg?: string) {
   }
 
   // Query registry for image digest
+  // Fallback chain: tracker proxy → direct registry → local docker inspect
   let digest = "";
-  try {
-    const digestUrl = `http://${lanIP}:5000/v2/lio-slam/manifests/${version}`;
-    const res = await fetch(digestUrl, {
-      headers: { "Accept": "application/vnd.docker.distribution.manifest.v2+json" },
-    });
-    const d = res.headers.get("Docker-Content-Digest");
-    if (d) digest = d;
-  } catch { /* digest optional */ }
+  const digestCandidates = [
+    { url: `http://${lanIP}:${REGISTRY_PORT}/v2/lio-slam/manifests/${version}`, insecure: false },
+    { url: `https://${lanIP}:${REGISTRY_DIRECT_PORT}/v2/lio-slam/manifests/${version}`, insecure: true },
+  ];
+  for (const { url, insecure } of digestCandidates) {
+    try {
+      const opts: RequestInit = {
+        headers: { "Accept": "application/vnd.docker.distribution.manifest.v2+json" },
+      };
+      if (insecure) {
+        (opts as any).tls = { rejectUnauthorized: false };
+      }
+      const res = await fetch(url, opts);
+      const d = res.headers.get("Docker-Content-Digest");
+      if (d) {
+        digest = d;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+  if (!digest) {
+    console.warn("[fleet-bundle] WARNING: could not query registry digest, trying local docker inspect ...");
+    try {
+      const localImg = `lio-slam:${version}`;
+      const proc = await $`docker image inspect ${localImg} --format='{{index .RepoDigests 0}}'`.quiet().nothrow();
+      if (proc.exitCode === 0) {
+        const fullRef = proc.stdout.toString().trim();
+        const parts = fullRef.split("@");
+        if (parts.length === 2) digest = parts[1];
+      }
+    } catch { /* digest will be omitted from manifest */ }
+  }
+  if (!digest) {
+    console.warn("[fleet-bundle] WARNING: digest not available — omitting from manifest.");
+  }
 
   // Generate manifest
   const manifest = [

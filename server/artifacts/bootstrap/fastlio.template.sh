@@ -178,7 +178,21 @@ for i in $(seq 1 15); do
   sleep 6
 done
 
-# ── 12. Summary ────────────────────────────────────────────────────────
+# ── 12. L2 smoke test (SLAM odometry) ──────────────────────────────────
+ODOM_OK=0
+if [[ "$SMOKE_OK" == "1" ]]; then
+  echo ""
+  echo "[fastlio] running L2 smoke test (SLAM /Odometry)..."
+  for i in $(seq 1 15); do
+    if docker exec "$CONTAINER_NAME" bash /catkin_ws/src/bringup/scripts/check-l2.sh 2>/dev/null; then
+      ODOM_OK=1
+      break
+    fi
+    sleep 6
+  done
+fi
+
+# ── 13. Summary ────────────────────────────────────────────────────────
 echo ""
 echo "============================================"
 echo " fastlio deployment summary"
@@ -189,12 +203,28 @@ echo " image:       $IMAGE"
 echo " container:   $CONTAINER_NAME (${CID:0:12})"
 echo " runtime:     $RUNTIME_ROOT"
 if [[ "$SMOKE_OK" == "1" ]]; then
-  echo " smoke:       ${GREEN}${BOLD}PASS${RESET}"
-  echo "============================================"
-  echo ""
-  echo "${GREEN}${BOLD}[fastlio] deployment OK${RESET}"
-  docker logs --tail 10 "$CONTAINER_NAME"
-  exit 0
+  if [[ "$ODOM_OK" == "1" ]]; then
+    echo " smoke:       ${GREEN}${BOLD}PASS${RESET}"
+    echo " odometry:    ${GREEN}${BOLD}PASS${RESET}"
+    echo "============================================"
+    echo ""
+    echo "${GREEN}${BOLD}[fastlio] deployment OK${RESET}"
+    docker logs --tail 10 "$CONTAINER_NAME"
+    exit 0
+  else
+    echo " smoke:       ${GREEN}${BOLD}PASS${RESET}"
+    echo " odometry:    ${RED}${BOLD}FAIL${RESET}"
+    echo "============================================"
+    echo ""
+    echo "${RED}${BOLD}[fastlio] deployment WARNING — SLAM odometry not detected${RESET}"
+    echo ""
+    echo "${BOLD}  LiDAR and IMU are working, but SLAM is not producing odometry.${RESET}"
+    echo "  This may be normal if the device is stationary and FAST_LIO"
+    echo "  initialization has not converged. Move the device or check logs."
+    echo ""
+    docker logs --tail 20 "$CONTAINER_NAME"
+    exit 0
+  fi
 else
   echo " smoke:       ${RED}${BOLD}FAIL${RESET}"
   echo "============================================"
