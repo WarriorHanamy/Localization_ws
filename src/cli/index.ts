@@ -12,6 +12,7 @@ import { cmdFleetBundle } from "./fleet-bundle";
 import { cmdFleetArtifacts } from "./fleet-artifacts";
 import { cmdRegistry } from "./registry";
 import { cmdProd } from "./prod";
+import { cmdRelease } from "./release";
 import { cmdDoc } from "./doc";
 import { cmdStatus } from "./status";
 import { WORKSPACE_PKGS, REC_DEVICE_LOC_WS, RECIPES, RELEASE_CONFIGS, DOCKER_IMAGES } from "../core/config";
@@ -22,6 +23,7 @@ const COMPLETION_DEFAULTS: Record<string, () => string[]> = {
   command: () => [
     "sync", "check", "paths", "rviz", "source",
     "dashboard", "dev", "smoke", "doc", "status",
+    "release",
     "docker-dbuild", "docker-push", "docker-start",
     "docker-shell", "fleet-bundle", "fleet-artifacts",
     "registry", "prod", "help",
@@ -37,6 +39,7 @@ const COMPLETION_DEFAULTS: Record<string, () => string[]> = {
   registry: () => ["start", "stop", "status"],
   doc: () => ["codebase", "pipeline"],
   "doc:pipeline": () => Object.keys(RECIPES).sort(),
+  release: () => [...RELEASE_CONFIGS],
   status: () => ["fleet"],
   rviz: () => ["fast-lio", "livox"],
   recipe: () => Object.keys(RECIPES).sort(),
@@ -72,8 +75,11 @@ Docker commands:
   docker-start       start a named container for a recipe
   docker-shell       exec bash into a running container
 
+Release:
+  release <config>          snapshot bringup/ → releases/<config>/ + fleet-bundle
+
 Fleet bootstrap:
-  fleet-bundle [version]     pack bringup/ → tarball + sha256 + latest.txt
+  fleet-bundle [version]     pack releases/<config>/ → tarball + sha256 + latest.txt
   fleet-artifacts start      start artifact HTTP server on :8080
   fleet-artifacts stop       stop artifact server
   fleet-artifacts status     show artifact server status
@@ -148,6 +154,7 @@ function recordInvocation(): void {
   const subCtxs = new Set(["prod", "smoke", "docker-dbuild", "fleet-artifacts", "registry", "doc", "status", "rviz"]);
   if (subCtxs.has(CMD)) logCompletion(CMD, args[0]);
   if (["docker-start", "docker-shell"].includes(CMD)) logCompletion("recipe", args[0]);
+  if (CMD === "release") logCompletion("release", args[0]);
   if (CMD === "fleet-bundle") logCompletion("fleet-bundle", args[0]);
   if (CMD === "doc" && args[0] === "pipeline" && args[1]) logCompletion("recipe", args[1]);
   if (CMD === "prod" && (args[0] === "start" || args[0] === "slam" || args[0] === "slam-map" || args[0] === "reloc") && args[1]) logCompletion("recipe", args[1]);
@@ -205,6 +212,9 @@ async function main() {
       break;
     case "docker-push":
       await cmdDockerPush();
+      break;
+    case "release":
+      await cmdRelease(args[0]);
       break;
     case "fleet-bundle":
       await cmdFleetBundle(args[0]);

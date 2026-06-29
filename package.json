@@ -15,6 +15,7 @@
     "smoke": "bun src/cli/index.ts smoke",
     "doc": "bun src/cli/index.ts doc",
     "status": "bun src/cli/index.ts status",
+    "release": "bun src/cli/index.ts release",
     "docker-dbuild": "bun src/cli/index.ts docker-dbuild",
     "docker-push": "bun src/cli/index.ts docker-push",
     "docker-start": "bun src/cli/index.ts docker-start",

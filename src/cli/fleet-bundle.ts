@@ -7,13 +7,14 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 
 export async function cmdFleetBundle(config?: string, versionArg?: string) {
-  if (!config || !(RELEASE_CONFIGS as unknown as string[]).includes(config)) {
+  const repo = getRepoRoot();
+  const configKnown = (RELEASE_CONFIGS as unknown as string[]).includes(config ?? "");
+  const configExists = config && existsSync(join(repo, "releases", config));
+  if (!config || !(configKnown || configExists)) {
     console.error("[fleet-bundle] Usage: bun run fleet-bundle <config> [version]");
-    console.error(`  Configs: ${RELEASE_CONFIGS.join(", ")}`);
+    console.error(`  Known configs: ${RELEASE_CONFIGS.join(", ")}`);
     process.exit(1);
   }
-
-  const repo = getRepoRoot();
   const version = versionArg || DOCKER_IMAGE_TAG;
   const bundleName = `fastlio-runtime-${config}`;
 
