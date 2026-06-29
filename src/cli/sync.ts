@@ -10,7 +10,7 @@ function existsDir(path: string): boolean {
 }
 
 function copyReleaseToBringup(config: string, repo: string) {
-  const src = join(repo, "releases", config);
+  const src = join(repo, "dist", "runtime_configs", config);
   const subs = [
     { r: "launch",  b: "launch" },
     { r: "config",  b: "config" },
@@ -28,7 +28,7 @@ function copyReleaseToBringup(config: string, repo: string) {
     }
   }
 
-  console.log(`[sync] bringup/ ← releases/${config}`);
+  console.log(`[sync] bringup/ ← dist/runtime_configs/${config}`);
 }
 
 export async function cmdSync(config?: string): Promise<void> {

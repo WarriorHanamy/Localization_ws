@@ -1,14 +1,14 @@
 FROM lio-base:cuda0.0.0-run-ubuntu20.04-arm64
 
 # Layer 1 — stable SLAM packages (rarely changed)
-COPY ekf_quat_pose/     /catkin_ws/src/ekf_quat_pose/
-COPY incremental_map_publisher/ /catkin_ws/src/incremental_map_publisher/
+COPY ros_packages/ekf_quat_pose/     /catkin_ws/src/ekf_quat_pose/
+COPY ros_packages/incremental_map_publisher/ /catkin_ws/src/incremental_map_publisher/
 RUN . /opt/ros/noetic/setup.sh && \
     cd /catkin_ws && \
     catkin_make -j$(nproc) --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # Layer 2 — hot packages (frequently changed)
-COPY FAST_LIO/          /catkin_ws/src/fast_lio/
+COPY ros_packages/FAST_LIO/          /catkin_ws/src/fast_lio/
 COPY bringup/           /catkin_ws/src/bringup/
 RUN . /opt/ros/noetic/setup.sh && \
     cd /catkin_ws && \

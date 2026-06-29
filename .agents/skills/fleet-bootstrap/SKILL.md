@@ -211,7 +211,7 @@ Layout:
         └── latest.txt             # plain text, no newline
 ```
 
-The template lives at `server/artifacts/bootstrap/fastlio.template.sh` in the repo.
+The template lives at `dist/artifacts/bootstrap/fastlio.template.sh` in the repo.
 `fleet-artifacts start` reads the template, replaces `__ARTIFACT_BASE__` with the
 dev-host LAN IP, and writes the result to `install/fastlio` in the serve root.
 

@@ -228,12 +228,12 @@ Consistent host-to-container mapping for all packages across images:
 | Host path                    | Container path                            | Method     | Image    |
 | ---------------------------- | ----------------------------------------- | ---------- | -------- |
 | `docker/entrypoint.sh`       | `/entrypoint.sh`                          | COPY       | base     |
-| `.docker-sdk/livox_sdk2/`    | `/usr/local/lib/` `/usr/local/include/`   | COPY       | base     |
-| `livox_ros_driver2/`           | `/catkin_ws/src/livox_ros_driver2/`       | COPY       | base     |
-| `ekf_quat_pose/`               | `/catkin_ws/src/ekf_quat_pose/`           | COPY       | SLAM     |
-| `incremental_map_publisher/`   | `/catkin_ws/src/incremental_map_publisher/` | COPY     | SLAM     |
-| `FAST_LIO/`                    | `/catkin_ws/src/fast_lio/`                | COPY       | SLAM     |
-| `LiDAR_IMU_Init/`              | `/catkin_ws/src/lidar_imu_init/`          | COPY       | calib    |
+| `bringup/resource/livox_sdk2/` | `/usr/local/lib/` `/usr/local/include/` | COPY       | base     |
+| `bringup/resource/livox_ros_driver2/` | `/opt/ros/noetic/...`          | COPY       | base     |
+| `ros_packages/ekf_quat_pose/` | `/catkin_ws/src/ekf_quat_pose/`         | COPY       | SLAM     |
+| `ros_packages/incremental_map_publisher/` | `/catkin_ws/src/incremental_map_publisher/` | COPY | SLAM |
+| `ros_packages/FAST_LIO/`      | `/catkin_ws/src/fast_lio/`                | COPY       | SLAM     |
+| `ros_packages/LiDAR_IMU_Init/` | `/catkin_ws/src/lidar_imu_init/`        | COPY       | calib    |
 | `bringup/`                     | `/catkin_ws/src/bringup/`                 | bind-mount | runtime  |
 | `bringup/PCD/` (symlink)       | `/catkin_ws/src/fast_lio/PCD/`            | symlink    | prod     |
 

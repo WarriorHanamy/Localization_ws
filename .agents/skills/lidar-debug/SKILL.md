@@ -544,7 +544,6 @@ Use this 7-step flow when bringup fails (substitute `{model}`):
 | `bringup/launch/c5v1_mapping.launch` / `c5pro_mapping.launch`        | Model-specific FAST_LIO launch                  |
 | `bringup/config/c5v1_livox_mid360_config.json` / `c5pro_livox_mid360s_config.json` | Model-specific Livox network/device JSON        |
 | `bringup/config/c5v1_fastlio_mid360_config.yaml` / `c5pro_fastlio_mid360s_config.yaml` | Model-specific FAST_LIO parameters              |
-| `FAST_LIO/include/preprocess.h`                   | Authoritative `lidar_type` enum and schemas    |
-| `FAST_LIO/src/laserMapping.cpp`                   | Authoritative subscriber branch                 |
-| `livox_ros_driver2/src/lddc.cpp`                  | Authoritative PointCloud2 field schema           |
+| `ros_packages/FAST_LIO/include/preprocess.h`     | Authoritative `lidar_type` enum and schemas    |
+| `ros_packages/FAST_LIO/src/laserMapping.cpp`     | Authoritative subscriber branch                 |
 | `/usr/local/include/livox_lidar_def.h`             | SDK device type enum (Jetson side)             |

@@ -10,7 +10,7 @@ function generateBootstrapScript(): string {
   const lanIP = getDevelHostLANIP();
   const base = lanIP ? `http://${lanIP}:${ARTIFACT_PORT}` : "__ARTIFACT_BASE__";
 
-  const templatePath =     join(getRepoRoot(), "server", "artifacts", "bootstrap", "fastlio.template.sh");
+  const templatePath =     join(getRepoRoot(), "dist", "artifacts", "bootstrap", "fastlio.template.sh");
   if (!existsSync(templatePath)) {
     throw new Error(`Bootstrap template not found: ${templatePath}`);
   }

@@ -220,8 +220,7 @@ at `192.168.55.100` to route the connection over the USB link.
 
 | Config                          | Path                                    | Topics                                          |
 | ------------------------------- | --------------------------------------- | ----------------------------------------------- |
-| FAST_LIO visualization         | `FAST_LIO/rviz_cfg/loam_livox.rviz`     | `/cloud_registered`, `/Odometry`, `/ekf_odom`   |
-| Livox raw point cloud          | `livox_ros_driver2/config/display_point_cloud_ROS1.rviz` | `/livox/lidar`                     |
+| FAST_LIO visualization         | `ros_packages/FAST_LIO/rviz_cfg/loam_livox.rviz` | `/cloud_registered`, `/Odometry`, `/ekf_odom` |
 
 ### RustDesk Quick Reference
 

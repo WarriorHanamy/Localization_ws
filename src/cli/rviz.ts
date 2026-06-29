@@ -33,8 +33,7 @@ function launchRustdesk(): void {
 }
 
 const PRESETS: Record<string, string> = {
-  "fast-lio": `${REC_DEVICE_LOC_WS}/FAST_LIO/rviz_cfg/loam_livox.rviz`,
-  livox: `${REC_DEVICE_LOC_WS}/livox_ros_driver2/config/display_point_cloud_ROS1.rviz`,
+  "fast-lio": `${REC_DEVICE_LOC_WS}/ros_packages/FAST_LIO/rviz_cfg/loam_livox.rviz`,
 };
 
 export interface RvizArgs {

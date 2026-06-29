@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # LiDAR-IMU calibration package
-COPY LiDAR_IMU_Init/ /catkin_ws/src/lidar_imu_init/
+COPY ros_packages/LiDAR_IMU_Init/ /catkin_ws/src/lidar_imu_init/
 # lio-base does not contain a built /catkin_ws/devel tree. This is the first
 # catkin_make for the calib image, so only source the ROS install space here.
 RUN . /opt/ros/noetic/setup.sh && \

@@ -24,7 +24,7 @@ __pycache__/
 *.ply
 
 # FAST_LIO runtime logs (keep analysis scripts: plot.py, guide.md, *.m)
-FAST_LIO/Log/*.txt
+ros_packages/FAST_LIO/Log/*.txt
 
 # Compiled objects / libraries
 *.o

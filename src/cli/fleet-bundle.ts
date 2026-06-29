@@ -9,7 +9,7 @@ import { join } from "path";
 export async function cmdFleetBundle(config?: string, versionArg?: string) {
   const repo = getRepoRoot();
   const configKnown = (RELEASE_CONFIGS as unknown as string[]).includes(config ?? "");
-  const configExists = config && existsSync(join(repo, "releases", config));
+  const configExists = config && existsSync(join(repo, "dist", "runtime_configs", config));
   if (!config || !(configKnown || configExists)) {
     console.error("[fleet-bundle] Usage: bun run fleet-bundle <config> [version]");
     console.error(`  Known configs: ${RELEASE_CONFIGS.join(", ")}`);
@@ -35,10 +35,10 @@ export async function cmdFleetBundle(config?: string, versionArg?: string) {
   }
   mkdirSync(stagingDir, { recursive: true });
 
-  console.log(`[fleet-bundle] packaging releases/${config}/ → ${bundleName} ...`);
+  console.log(`[fleet-bundle] packaging dist/runtime_configs/${config}/ → ${bundleName} ...`);
 
   // Copy entire release config
-  const srcDir = join(repo, "releases", config);
+  const srcDir = join(repo, "dist", "runtime_configs", config);
   for (const sub of ["launch", "config", "scripts", "rviz", "PCD"]) {
     if (existsSync(join(srcDir, sub))) {
       mkdirSync(join(stagingDir, sub), { recursive: true });

@@ -20,7 +20,7 @@ function ask(question: string): Promise<string> {
 
 function copyBringupToRelease(repo: string, config: string) {
   const src = join(repo, "bringup");
-  const dst = join(repo, "releases", config);
+  const dst = join(repo, "dist", "runtime_configs", config);
 
   mkdirSync(dst, { recursive: true });
 
@@ -41,7 +41,7 @@ function copyBringupToRelease(repo: string, config: string) {
     }
   }
 
-  console.log(`[release] releases/${config}/ ← bringup/`);
+  console.log(`[release] dist/runtime_configs/${config}/ ← bringup/`);
 }
 
 async function promptConfigFromUser(): Promise<string> {
@@ -99,9 +99,9 @@ export async function cmdRelease(config?: string) {
   }
 
   const repo = getRepoRoot();
-  const dst = join(repo, "releases", config);
+  const dst = join(repo, "dist", "runtime_configs", config);
   if (existsSync(dst)) {
-    const answer = await ask(`Overwrite existing releases/${config}/? [y/N] `);
+    const answer = await ask(`Overwrite existing dist/runtime_configs/${config}/? [y/N] `);
     if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
       console.log("[release] Aborted.");
       process.exit(0);
@@ -113,5 +113,5 @@ export async function cmdRelease(config?: string) {
   console.log(`[release] Chaining: fleet-bundle ${config} ...`);
   await cmdFleetBundle(config);
 
-  console.log(`[release] Complete: releases/${config}/ packaged.`);
+  console.log(`[release] Complete: dist/runtime_configs/${config}/ packaged.`);
 }

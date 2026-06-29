@@ -1,13 +1,12 @@
-FROM arm64v8/ubuntu:20.04
+FROM arm64v8/ros:noetic-ros-base-focal
 ENV DEBIAN_FRONTEND=noninteractive TZ=Asia/Shanghai
 
-# Install gnupg for apt-key and add ROS Noetic source (TUNA mirror for ARM64)
-RUN apt-get update && apt-get install -y gnupg \
-    && rm -rf /var/lib/apt/lists/*
+# Replace stale ROS apt source with TUNA mirror for arm64
 COPY docker/ros-archive-keyring.gpg /tmp/ros-archive-keyring.gpg
-RUN apt-key add /tmp/ros-archive-keyring.gpg \
-    && echo "deb [arch=arm64] http://mirrors.tuna.tsinghua.edu.cn/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros.list \
-    && rm -f /tmp/ros-archive-keyring.gpg
+RUN rm -f /etc/apt/sources.list.d/ros1.list /etc/apt/sources.list.d/ros.list 2>/dev/null; \
+    apt-key add /tmp/ros-archive-keyring.gpg && \
+    echo "deb [arch=arm64] http://mirrors.tuna.tsinghua.edu.cn/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros.list && \
+    rm -f /tmp/ros-archive-keyring.gpg
 
 # Layer A — build toolchain (extremely stable, ~500MB)
 RUN apt-get update && apt-get install -y \
@@ -15,11 +14,6 @@ RUN apt-get update && apt-get install -y \
     libeigen3-dev \
     libopencv-dev \
     python3-numpy \
-    && rm -rf /var/lib/apt/lists/*
-
-# Layer B — ROS Noetic base (extremely stable, ~400MB)
-RUN apt-get update && apt-get install -y \
-    ros-noetic-ros-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer C — perception + transforms (PCL, cv-bridge, TF stack)

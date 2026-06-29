@@ -92,7 +92,7 @@ After any code or config change that affects SLAM behavior, the agent MUST
 verify the change before declaring the task complete. This is the agent's
 responsibility, never the user's.
 
-**C++ changes** (FAST_LIO/, livox_ros_driver2/, ekf_quat_pose/, incremental_map_publisher/):
+**C++ changes** (ros_packages/FAST_LIO/, ros_packages/ekf_quat_pose/, ros_packages/incremental_map_publisher/):
 
 ```bash
 bun run sync && bun run docker-dbuild

@@ -76,10 +76,10 @@ Docker commands:
   docker-shell       exec bash into a running container
 
 Release:
-  release <config>          snapshot bringup/ → releases/<config>/ + fleet-bundle
+  release <config>          snapshot bringup/ → dist/runtime_configs/<config>/ + fleet-bundle
 
 Fleet bootstrap:
-  fleet-bundle [version]     pack releases/<config>/ → tarball + sha256 + latest.txt
+  fleet-bundle [version]     pack dist/runtime_configs/<config>/ → tarball + sha256 + latest.txt
   fleet-artifacts start      start artifact HTTP server on :8080
   fleet-artifacts stop       stop artifact server
   fleet-artifacts status     show artifact server status

@@ -14,7 +14,6 @@ export const SSH_OPTS =
 
 export const WORKSPACE_PKGS = [
   "FAST_LIO",
-  "livox_ros_driver2",
   "ekf_quat_pose",
   "incremental_map_publisher",
   "bringup",
